@@ -5,6 +5,7 @@ import { Track } from 'livekit-client';
 import livekitService from '../services/livekitService';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import TranscriptPanel from '../components/TranscriptPanel';
 
 // Componente para detectar participantes remotos (avatar)
 function AvatarDetector({ onAvatarConnected }) {
@@ -353,11 +354,11 @@ export default function AvatarSession() {
             isEnabled={isAvatarConnected}
           />
 
-          <div className="flex-1 flex p-4 gap-3 overflow-hidden max-w-7xl mx-auto w-full" ref={videoContainerRef}>
-            {/* Grid de participantes */}
-            <div className="w-full flex flex-col gap-3">
-              {/* Grid de participantes */}
-              <div className="grid grid-cols-2 gap-3" style={{ height: 'calc(100vh - 200px)' }}>
+          <div className="flex-1 flex gap-3 overflow-hidden p-4" ref={videoContainerRef}>
+            {/* Panel de Videos (60%) - Izquierda */}
+            <div className="w-[60%] flex flex-col gap-3">
+              {/* Grid de Avatar y Usuario (lado a lado) */}
+              <div className="grid grid-cols-2 gap-3 flex-1">
                 {/* Avatar (Izquierda) */}
                 <div
                   className={`relative bg-gray-800 rounded-lg overflow-hidden transition-all duration-300 ${
@@ -416,8 +417,8 @@ export default function AvatarSession() {
                 </div>
               </div>
 
-              {/* Barra de controles inferior */}
-              <div className="flex justify-center items-center gap-3">
+              {/* Barra de controles */}
+              <div className="flex justify-center items-center gap-3 py-2">
                 <button
                   onClick={toggleMute}
                   disabled={!isAvatarConnected}
@@ -463,6 +464,13 @@ export default function AvatarSession() {
                 <div className="text-gray-500 text-xs ml-4">
                   Atajos: <kbd className="bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">Space</kbd> Mutear • <kbd className="bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">F</kbd> Fullscreen
                 </div>
+              </div>
+            </div>
+
+            {/* Panel de Transcripciones (40%) - Derecha */}
+            <div className="w-[40%] flex-shrink-0" style={{ height: 'calc(100vh - 140px)' }}>
+              <div className="h-full rounded-lg overflow-hidden border border-gray-700 shadow-lg">
+                <TranscriptPanel />
               </div>
             </div>
           </div>
