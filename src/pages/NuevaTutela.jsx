@@ -30,6 +30,11 @@ export default function NuevaTutela() {
     direccion_solicitante: '',
     telefono_solicitante: '',
     email_solicitante: '',
+    actua_en_representacion: false,
+    nombre_representado: '',
+    identificacion_representado: '',
+    relacion_representado: '',
+    tipo_representado: '',
     entidad_accionada: '',
     direccion_entidad: '',
     representante_legal: '',
@@ -37,6 +42,7 @@ export default function NuevaTutela() {
     derechos_vulnerados: '',
     pretensiones: '',
     fundamentos_derecho: '',
+    pruebas: '',
   });
 
   // Cargar datos de referencia al montar el componente
@@ -82,6 +88,11 @@ export default function NuevaTutela() {
         direccion_solicitante: casoData.direccion_solicitante || '',
         telefono_solicitante: casoData.telefono_solicitante || '',
         email_solicitante: casoData.email_solicitante || '',
+        actua_en_representacion: casoData.actua_en_representacion || false,
+        nombre_representado: casoData.nombre_representado || '',
+        identificacion_representado: casoData.identificacion_representado || '',
+        relacion_representado: casoData.relacion_representado || '',
+        tipo_representado: casoData.tipo_representado || '',
         entidad_accionada: casoData.entidad_accionada || '',
         direccion_entidad: casoData.direccion_entidad || '',
         representante_legal: casoData.representante_legal || '',
@@ -89,6 +100,7 @@ export default function NuevaTutela() {
         derechos_vulnerados: casoData.derechos_vulnerados || '',
         pretensiones: casoData.pretensiones || '',
         fundamentos_derecho: casoData.fundamentos_derecho || '',
+        pruebas: casoData.pruebas || '',
       });
       setDocumentoGenerado(casoData.documento_generado || '');
     } catch (error) {
@@ -97,10 +109,10 @@ export default function NuevaTutela() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
 
     // Limpiar error de validación para este campo
@@ -501,6 +513,102 @@ export default function NuevaTutela() {
                 />
               </div>
             </div>
+
+            {/* Representación de Terceros */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="flex items-center gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  name="actua_en_representacion"
+                  checked={formData.actua_en_representacion}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label className="text-sm font-medium text-gray-900">
+                  ¿Actúa en representación de otra persona? (menor, adulto mayor, persona con discapacidad, etc.)
+                </label>
+              </div>
+
+              {formData.actua_en_representacion && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="md:col-span-2">
+                    <p className="text-sm text-blue-800 mb-4">
+                      ℹ️ Proporciona los datos de la persona cuyos derechos están siendo representados
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre Completo de la Persona Representada *
+                    </label>
+                    <input
+                      type="text"
+                      name="nombre_representado"
+                      value={formData.nombre_representado}
+                      onChange={handleChange}
+                      required={formData.actua_en_representacion}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Identificación de la Persona Representada *
+                    </label>
+                    <input
+                      type="text"
+                      name="identificacion_representado"
+                      value={formData.identificacion_representado}
+                      onChange={handleChange}
+                      required={formData.actua_en_representacion}
+                      placeholder="Ej: 1234567890"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Relación con la Persona Representada *
+                    </label>
+                    <select
+                      name="relacion_representado"
+                      value={formData.relacion_representado}
+                      onChange={handleChange}
+                      required={formData.actua_en_representacion}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Seleccione...</option>
+                      <option value="madre">Madre</option>
+                      <option value="padre">Padre</option>
+                      <option value="hijo">Hijo/a</option>
+                      <option value="cuidador">Cuidador/a</option>
+                      <option value="apoderado">Apoderado/a</option>
+                      <option value="tutor">Tutor/a legal</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tipo de Persona Representada *
+                    </label>
+                    <select
+                      name="tipo_representado"
+                      value={formData.tipo_representado}
+                      onChange={handleChange}
+                      required={formData.actua_en_representacion}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Seleccione...</option>
+                      <option value="menor">Menor de edad</option>
+                      <option value="adulto_mayor">Adulto mayor</option>
+                      <option value="persona_discapacidad">Persona con discapacidad</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sección 2: Entidad Accionada/Destinataria */}
@@ -668,6 +776,23 @@ export default function NuevaTutela() {
                   value={formData.fundamentos_derecho}
                   onChange={handleChange}
                   rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pruebas y Documentos Anexos
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Lista los documentos que anexarás (diagnósticos, fórmulas médicas, fotografías, derechos de petición previos, certificaciones, etc.)
+                </p>
+                <textarea
+                  name="pruebas"
+                  value={formData.pruebas}
+                  onChange={handleChange}
+                  rows={4}
+                  placeholder="Ej:&#10;- Diagnóstico médico del Dr. Juan Pérez (20/11/2024)&#10;- Fórmula médica para medicamento X&#10;- Derecho de petición radicado el 01/11/2024 (sin respuesta)&#10;- Fotografías del estado actual"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
