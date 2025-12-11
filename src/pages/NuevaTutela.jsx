@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import casoService from '../services/casoService';
 import api from '../services/api';
 import AnalisisDocumento from '../components/AnalisisDocumento';
+import { FieldValidationMessages, ValidationSummary } from '../components/ValidationMessage';
 
 export default function NuevaTutela() {
   const { casoId } = useParams();
@@ -17,6 +18,7 @@ export default function NuevaTutela() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const autoGuardadoRef = useRef(null);
   const [caso, setCaso] = useState(null);
+  const [validationResult, setValidationResult] = useState(null);
 
   // Estados para datos de referencia colombianos
   const [derechosFundamentales, setDerechosFundamentales] = useState([]);
@@ -240,6 +242,27 @@ export default function NuevaTutela() {
     }
   };
 
+  // Validar caso en tiempo real
+  const validarCaso = async () => {
+    if (!casoId) return null;
+
+    try {
+      const resultado = await casoService.validarCaso(casoId);
+      setValidationResult(resultado);
+      return resultado;
+    } catch (error) {
+      console.error('Error validando caso:', error);
+      return null;
+    }
+  };
+
+  // Validar después de cargar el caso
+  useEffect(() => {
+    if (casoId && caso) {
+      validarCaso();
+    }
+  }, [casoId, caso]);
+
   const handleGenerarDocumento = async () => {
     if (!casoId) {
       alert('Primero debes guardar el caso antes de generar el documento');
@@ -248,6 +271,17 @@ export default function NuevaTutela() {
 
     try {
       setGenerando(true);
+
+      // Validar antes de generar
+      const validacion = await validarCaso();
+      if (validacion && !validacion.valido) {
+        // No generamos, el usuario verá el resumen de errores en pantalla
+        alert('Por favor corrige los errores señalados antes de generar el documento');
+        // Scroll al resumen de validación
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       const casoActualizado = await casoService.generarDocumento(casoId);
       setCaso(casoActualizado);
       setDocumentoGenerado(casoActualizado.documento_generado);
@@ -255,7 +289,23 @@ export default function NuevaTutela() {
       alert('¡Documento generado exitosamente con IA!\n\nRevisa el análisis de calidad y jurisprudencia abajo.');
     } catch (error) {
       console.error('Error generando documento:', error);
-      const errorMsg = error.response?.data?.detail || 'Error al generar el documento';
+
+      // Manejar error 422 con detalles de validación
+      if (error.response?.status === 422 && error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (detail.errores || detail.advertencias) {
+          setValidationResult({
+            valido: false,
+            errores: detail.errores || [],
+            advertencias: detail.advertencias || []
+          });
+          alert('El documento no se puede generar. Por favor corrige los errores señalados.');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      }
+
+      const errorMsg = error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al generar el documento';
       alert(errorMsg);
     } finally {
       setGenerando(false);
@@ -365,7 +415,15 @@ export default function NuevaTutela() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Resumen de Validación */}
+        {validationResult && (
+          <ValidationSummary
+            validationResult={validationResult}
+            onFixErrors={() => window.scrollTo({ top: document.getElementById('formulario-caso').offsetTop - 100, behavior: 'smooth' })}
+          />
+        )}
+
+        <form id="formulario-caso" onSubmit={handleSubmit} className="space-y-8">
           {/* Selector de Tipo de Documento */}
           {!casoId && (
             <div className="bg-white shadow rounded-lg p-6">
@@ -435,9 +493,9 @@ export default function NuevaTutela() {
                   name="nombre_solicitante"
                   value={formData.nombre_solicitante}
                   onChange={handleChange}
-                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+                <FieldValidationMessages fieldName="nombre_solicitante" validationResult={validationResult} />
               </div>
 
               <div>
@@ -450,7 +508,6 @@ export default function NuevaTutela() {
                   value={formData.identificacion_solicitante}
                   onChange={handleChange}
                   onBlur={handleBlur}
-                  required
                   placeholder="Ej: 1234567890 o 900123456-7"
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                     erroresValidacion.identificacion_solicitante?.tipo === 'error'
@@ -467,6 +524,7 @@ export default function NuevaTutela() {
                     {erroresValidacion.identificacion_solicitante.mensaje}
                   </p>
                 )}
+                <FieldValidationMessages fieldName="identificacion_solicitante" validationResult={validationResult} />
               </div>
 
               <div className="md:col-span-2">
@@ -498,6 +556,7 @@ export default function NuevaTutela() {
                 <p className="text-xs text-gray-500 mt-1">
                   Formato: 10 dígitos para celular o 7 para fijo
                 </p>
+                <FieldValidationMessages fieldName="telefono_solicitante" validationResult={validationResult} />
               </div>
 
               <div>
@@ -511,6 +570,7 @@ export default function NuevaTutela() {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+                <FieldValidationMessages fieldName="email_solicitante" validationResult={validationResult} />
               </div>
             </div>
 
@@ -626,7 +686,6 @@ export default function NuevaTutela() {
                   name="entidad_accionada"
                   value={formData.entidad_accionada}
                   onChange={handleChange}
-                  required
                   list="entidades-sugerencias"
                   placeholder="Ej: Sanitas EPS, Ministerio de Salud..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -639,6 +698,7 @@ export default function NuevaTutela() {
                 <p className="text-xs text-gray-500 mt-1">
                   Comienza a escribir para ver sugerencias de entidades públicas
                 </p>
+                <FieldValidationMessages fieldName="entidad_accionada" validationResult={validationResult} />
               </div>
 
               <div className="md:col-span-2">
@@ -689,10 +749,10 @@ export default function NuevaTutela() {
                   name="hechos"
                   value={formData.hechos}
                   onChange={handleChange}
-                  required
                   rows={6}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+                <FieldValidationMessages fieldName="hechos" validationResult={validationResult} />
               </div>
 
               {/* Campo Derechos Vulnerados - Solo para Tutelas */}
@@ -736,11 +796,11 @@ export default function NuevaTutela() {
                     name="derechos_vulnerados"
                     value={formData.derechos_vulnerados}
                     onChange={handleChange}
-                    required
                     rows={4}
                     placeholder="Ej: Derecho a la Salud (Art. 49), Derecho a la Vida (Art. 11)..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  <FieldValidationMessages fieldName="derechos_vulnerados" validationResult={validationResult} />
                 </div>
               )}
 
@@ -758,10 +818,10 @@ export default function NuevaTutela() {
                   name="pretensiones"
                   value={formData.pretensiones}
                   onChange={handleChange}
-                  required
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+                <FieldValidationMessages fieldName="pretensiones" validationResult={validationResult} />
               </div>
 
               <div>

@@ -70,6 +70,16 @@ export const casoService = {
     }
   },
 
+  async validarCaso(casoId) {
+    try {
+      const response = await api.post(`/casos/${casoId}/validar`);
+      return response.data;
+    } catch (error) {
+      console.error('Error validando caso:', error);
+      throw error;
+    }
+  },
+
   async generarDocumento(casoId) {
     try {
       const response = await api.post(`/casos/${casoId}/generar`);
