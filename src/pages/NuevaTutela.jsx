@@ -59,6 +59,31 @@ export default function NuevaTutela() {
     }
   }, [casoId]);
 
+  // Pre-llenar con datos del perfil si es caso nuevo
+  useEffect(() => {
+    if (!casoId && user) {
+      prellenarDatosDesdePerfil();
+    }
+  }, [casoId, user]);
+
+  const prellenarDatosDesdePerfil = async () => {
+    try {
+      const response = await api.get('/casos/prellenar-datos');
+      const datosPerfil = response.data;
+
+      setFormData(prev => ({
+        ...prev,
+        nombre_solicitante: datosPerfil.nombre_solicitante || prev.nombre_solicitante,
+        email_solicitante: datosPerfil.email_solicitante || prev.email_solicitante,
+        identificacion_solicitante: datosPerfil.identificacion_solicitante || prev.identificacion_solicitante,
+        direccion_solicitante: datosPerfil.direccion_solicitante || prev.direccion_solicitante,
+        telefono_solicitante: datosPerfil.telefono_solicitante || prev.telefono_solicitante
+      }));
+    } catch (error) {
+      console.error('Error pre-llenando datos:', error);
+    }
+  };
+
   const cargarDatosReferencia = async () => {
     try {
       // Cargar derechos fundamentales
@@ -487,6 +512,11 @@ export default function NuevaTutela() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nombre Completo *
+                  {!casoId && formData.nombre_solicitante && (
+                    <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                      Desde perfil
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -501,6 +531,11 @@ export default function NuevaTutela() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Identificación (Cédula o NIT) *
+                  {!casoId && formData.identificacion_solicitante && (
+                    <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                      Desde perfil
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -530,6 +565,11 @@ export default function NuevaTutela() {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Dirección *
+                  {!casoId && formData.direccion_solicitante && (
+                    <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                      Desde perfil
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -544,6 +584,11 @@ export default function NuevaTutela() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Teléfono
+                  {!casoId && formData.telefono_solicitante && (
+                    <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                      Desde perfil
+                    </span>
+                  )}
                 </label>
                 <input
                   type="tel"
@@ -562,6 +607,11 @@ export default function NuevaTutela() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email
+                  {!casoId && formData.email_solicitante && (
+                    <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                      Desde perfil
+                    </span>
+                  )}
                 </label>
                 <input
                   type="email"

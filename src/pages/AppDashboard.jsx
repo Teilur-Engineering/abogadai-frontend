@@ -1,9 +1,54 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import perfilService from '../services/perfilService';
+import PerfilIncompletoModal from '../components/PerfilIncompletoModal';
 
 export default function AppDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [mostrarModalPerfil, setMostrarModalPerfil] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      verificarPerfil();
+    }
+  }, [user]);
+
+  const verificarPerfil = async () => {
+    try {
+      const estado = await perfilService.verificarEstado();
+      if (!estado.completo) {
+        setMostrarModalPerfil(true);
+      }
+    } catch (error) {
+      console.error('Error verificando perfil:', error);
+    }
+  };
+
+  const handleNuevoCaso = async () => {
+    // Verificar perfil antes de permitir crear caso
+    const estado = await perfilService.verificarEstado();
+    if (!estado.completo) {
+      setMostrarModalPerfil(true);
+      return;
+    }
+
+    // Continuar con creación del caso
+    navigate('/app/tutela/nueva');
+  };
+
+  const handleAvatar = async () => {
+    // Verificar perfil antes de permitir iniciar sesión con avatar
+    const estado = await perfilService.verificarEstado();
+    if (!estado.completo) {
+      setMostrarModalPerfil(true);
+      return;
+    }
+
+    // Continuar con avatar
+    navigate('/app/avatar');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -18,6 +63,12 @@ export default function AppDashboard() {
               </p>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
+            <button
+              onClick={() => navigate('/perfil')}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Mi Perfil
+            </button>
             <button
               onClick={logout}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
@@ -49,7 +100,7 @@ export default function AppDashboard() {
                 Crea una nueva acción de tutela para proteger tus derechos fundamentales
               </p>
               <button
-                onClick={() => navigate('/app/tutela/nueva')}
+                onClick={handleNuevoCaso}
                 className="w-full px-6 py-3 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Crear Tutela
@@ -69,7 +120,7 @@ export default function AppDashboard() {
                 Habla con nuestro asistente virtual con avatar para asesoría legal
               </p>
               <button
-                onClick={() => navigate('/app/avatar')}
+                onClick={handleAvatar}
                 className="w-full px-6 py-3 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Iniciar sesión
@@ -124,6 +175,12 @@ export default function AppDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Modal de perfil incompleto */}
+      <PerfilIncompletoModal
+        mostrar={mostrarModalPerfil}
+        onComplete={() => setMostrarModalPerfil(false)}
+      />
     </div>
   );
 }

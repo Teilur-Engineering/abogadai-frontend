@@ -7,6 +7,7 @@ import AppDashboard from './pages/AppDashboard';
 import AvatarSession from './pages/AvatarSession';
 import NuevaTutela from './pages/NuevaTutela';
 import MisCasos from './pages/MisCasos';
+import Perfil from './pages/Perfil';
 
 function App() {
   return (
@@ -58,6 +59,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <MisCasos />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/perfil"
+            element={
+              <ProtectedRoute>
+                <Perfil />
               </ProtectedRoute>
             }
           />

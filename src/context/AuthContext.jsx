@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import { authService } from '../services/authService';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -41,12 +42,34 @@ export const AuthProvider = ({ children }) => {
     authService.logout();
   };
 
+  const updateUserProfile = async (profileData) => {
+    try {
+      const response = await api.put('/api/perfil/', profileData);
+      setUser(response.data);  // Actualizar usuario en contexto
+      return response.data;
+    } catch (error) {
+      console.error('Error actualizando perfil:', error);
+      throw error;
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+    } catch (error) {
+      console.error('Error refrescando usuario:', error);
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
     signup,
     logout,
+    updateUserProfile,
+    refreshUser,
     isAuthenticated: !!user,
   };
 
