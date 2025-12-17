@@ -124,11 +124,91 @@ export default function AvatarSession() {
   const [conversacion, setConversacion] = useState([]);
   const videoContainerRef = useRef(null);
 
+  // Estados para video de bienvenida
+  const [showWelcomeVideo, setShowWelcomeVideo] = useState(false);
+  const welcomeVideoRef = useRef(null);
+  const videoScheduledRef = useRef(false); // Protección contra StrictMode
+
   // Inicializar: NO crear caso aún, solo mostrar pantalla Pre-llamada
   useEffect(() => {
     // El caso se creará cuando el usuario presione "Iniciar Sesión"
     sessionState.goToPreLlamada();
   }, []);
+
+  // Reproducir video de bienvenida (solo si viene de login, no en recargas)
+  useEffect(() => {
+    // Verificar si viene de login
+    const justLoggedIn = sessionStorage.getItem('justLoggedIn');
+    const alreadyScheduled = videoScheduledRef.current;
+
+    console.log('🎬 Verificando video de bienvenida...');
+    console.log(`   Estado: ${sessionState.isPreLlamada ? 'PRE_LLAMADA' : 'OTRO'}`);
+    console.log(`   Flag de login: ${justLoggedIn}`);
+    console.log(`   Ya programado: ${alreadyScheduled}`);
+
+    if (sessionState.isPreLlamada && justLoggedIn === 'true' && !alreadyScheduled) {
+      console.log('✅ Usuario acaba de hacer LOGIN → Programar video');
+
+      // Marcar como programado PRIMERO (protege contra StrictMode double-render)
+      videoScheduledRef.current = true;
+
+      // Esperar 2 segundos y mostrar video
+      const timer = setTimeout(() => {
+        console.log('🎬 Activando video ahora...');
+        setShowWelcomeVideo(true);
+        // Limpiar flag AQUÍ, solo cuando el video se ha activado
+        sessionStorage.removeItem('justLoggedIn');
+        console.log('🧹 Flag de login limpiada');
+      }, 2000);
+
+      return () => {
+        // Limpiar timer
+        clearTimeout(timer);
+        // Si el componente se desmonta antes de mostrar el video, resetear la ref
+        // Esto permite que se reintente en el siguiente mount (StrictMode)
+        if (!showWelcomeVideo) {
+          console.log('🔄 Cleanup: Video no se mostró, reseteando ref para reintentar');
+          videoScheduledRef.current = false;
+        }
+      };
+    } else {
+      console.log('⏭️ NO reproducir video');
+      if (!justLoggedIn) console.log('   Razón: No viene de login');
+      if (alreadyScheduled) console.log('   Razón: Ya fue programado');
+    }
+  }, [sessionState.isPreLlamada]);
+
+  // Reproducir video cuando se muestre
+  useEffect(() => {
+    if (showWelcomeVideo && welcomeVideoRef.current) {
+      console.log('▶️ Video montado en el DOM, intentando reproducir...');
+      const video = welcomeVideoRef.current;
+
+      // Asegurar que tiene volumen
+      video.volume = 1.0;
+      video.muted = false;
+
+      console.log('🔊 Configuración de video:');
+      console.log(`   - Volume: ${video.volume}`);
+      console.log(`   - Muted: ${video.muted}`);
+
+      // Intentar reproducir
+      const playPromise = video.play();
+
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('✅✅✅ Video reproduciéndose CON AUDIO exitosamente!');
+          })
+          .catch(err => {
+            console.error('❌ Error al reproducir video:', err.name);
+            console.error('   Mensaje:', err.message);
+            console.error('   Esto puede pasar si el navegador bloquea autoplay con audio');
+            console.error('   Solución: El video solo se reproduce en el primer inicio de sesión');
+          });
+      }
+    }
+  }, [showWelcomeVideo]);
 
   // Contador de tiempo de sesión (solo cuando está en sesión)
   useEffect(() => {
@@ -373,66 +453,103 @@ export default function AvatarSession() {
         {/* ESTADO A: PRE-LLAMADA */}
         {sessionState.isPreLlamada && (
           <div className="h-full flex items-center justify-center p-8">
-            <div className="max-w-2xl text-center">
+            <div className="max-w-xl text-center animate-fadeIn">
               <div
-                className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center"
+                className="relative mx-auto mb-6 rounded-full flex items-center justify-center animate-pulse-soft"
                 style={{
+                  width: '180px',
+                  height: '180px',
                   background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
-                  boxShadow: '0 8px 32px rgba(11, 109, 255, 0.3)'
+                  boxShadow: '0 12px 48px rgba(11, 109, 255, 0.4), 0 0 80px rgba(11, 109, 255, 0.25)',
+                  padding: '5px'
                 }}
               >
-                <svg className="w-16 h-16" style={{ color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+                <div className="relative w-full h-full rounded-full overflow-hidden bg-white">
+                  {/* Video de bienvenida */}
+                  {showWelcomeVideo && (
+                    <video
+                      ref={welcomeVideoRef}
+                      src="/assets/video_saludo_sofia.mp4"
+                      className="w-full h-full object-cover"
+                      style={{
+                        objectPosition: 'center',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        zIndex: 2
+                      }}
+                      playsInline
+                      preload="auto"
+                      onEnded={() => {
+                        console.log('🎬 Video terminado, mostrando imagen');
+                        setShowWelcomeVideo(false);
+                      }}
+                      onError={(e) => {
+                        console.error('❌ Error cargando video:', e);
+                        setShowWelcomeVideo(false);
+                      }}
+                    />
+                  )}
+
+                  {/* Imagen estática (se muestra cuando no hay video) */}
+                  <img
+                    src="/assets/sofia-avatar.avif"
+                    alt="Sofía - Asistente Legal"
+                    className="w-full h-full object-cover animate-breathe"
+                    style={{
+                      objectPosition: 'center',
+                      opacity: showWelcomeVideo ? 0 : 1,
+                      transition: 'opacity 0.3s ease-in-out'
+                    }}
+                  />
+
+                  {/* Indicador de disponibilidad (solo cuando NO hay video) */}
+                  {!showWelcomeVideo && (
+                    <div
+                      className="absolute bottom-1 right-1 rounded-full border-3 border-white animate-pulse"
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: 'var(--color-success)',
+                        boxShadow: '0 0 10px rgba(16, 185, 129, 0.6)',
+                        zIndex: 3
+                      }}
+                      title="Disponible"
+                    ></div>
+                  )}
+                </div>
               </div>
 
-              <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--neutral-800)' }}>
+              <h2 className="text-3xl font-bold mb-2" style={{ color: 'var(--neutral-800)' }}>
                 Hola {user?.nombre}, bienvenido
               </h2>
-              <p className="mb-8 text-lg" style={{ color: 'var(--neutral-600)' }}>
+              <p className="text-sm mb-5" style={{ color: 'var(--color-primary)', fontWeight: '600' }}>
+                Soy Sofía, tu asistente legal
+              </p>
+              <p className="mb-6 text-base leading-relaxed" style={{ color: 'var(--neutral-600)' }}>
                 Estoy lista para ayudarte a crear tu tutela o derecho de petición.
-                <br />
                 Presiona el botón para iniciar la conversación.
               </p>
 
               <button
                 onClick={handleIniciarSesion}
-                className="font-bold py-4 px-8 rounded-lg text-lg transition transform hover:scale-105"
+                className="font-bold py-3 px-8 rounded-lg text-base transition-all duration-300 transform hover:scale-105"
                 style={{
                   background: 'linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
                   color: 'white',
-                  boxShadow: '0 4px 16px rgba(11, 109, 255, 0.3)'
+                  boxShadow: '0 6px 20px rgba(11, 109, 255, 0.35)'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'linear-gradient(90deg, var(--color-primary-dark) 0%, var(--color-primary) 100%)';
+                  e.currentTarget.style.boxShadow = '0 8px 28px rgba(11, 109, 255, 0.5)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(11, 109, 255, 0.35)';
                 }}
               >
                 Iniciar Sesión
               </button>
-
-              <div className="mt-12 grid grid-cols-3 gap-6 text-sm" style={{ color: 'var(--neutral-600)' }}>
-                <div>
-                  <svg className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  <p>Conversación con avatar</p>
-                </div>
-                <div>
-                  <svg className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-info)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p>Revisión de datos</p>
-                </div>
-                <div>
-                  <svg className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-success)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  <p>Documento generado</p>
-                </div>
-              </div>
             </div>
           </div>
         )}

@@ -29,6 +29,11 @@ export default function Login() {
     try {
       await login(formData);
       toast.success('Inicio de sesión exitoso');
+
+      // Marcar que acaba de hacer login para reproducir video de bienvenida
+      sessionStorage.setItem('justLoggedIn', 'true');
+      console.log('✅ Login exitoso - Flag de video establecida');
+
       navigate('/app');
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Error al iniciar sesión');

@@ -158,6 +158,24 @@ body {
   outline-offset: 2px;
 }
 
+/* Cursor pointer para elementos interactivos */
+button,
+a,
+[role="button"],
+[onclick],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+select {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  cursor: not-allowed;
+}
+
 /* ============================================
    ANIMACIONES KEYFRAMES
    ============================================ */
@@ -264,6 +282,26 @@ body {
   }
 }
 
+@keyframes pulseSoft {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 32px rgba(11, 109, 255, 0.4), 0 0 60px rgba(11, 109, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 8px 40px rgba(11, 109, 255, 0.5), 0 0 80px rgba(11, 109, 255, 0.3);
+  }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.01);
+  }
+}
+
 @keyframes bounce {
   0%, 100% {
     transform: translateY(-25%);
@@ -322,6 +360,14 @@ body {
 
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulseSoft 3s ease-in-out infinite;
+}
+
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
 }
 
 .animate-bounce {

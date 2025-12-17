@@ -153,12 +153,14 @@ export default function Sidebar() {
             <button
               onClick={() => navigate('/app/perfil')}
               className="w-full flex items-center gap-3 px-2 py-2 rounded-lg transition-all duration-200"
-              style={{ backgroundColor: 'transparent' }}
+              style={{ backgroundColor: 'transparent', cursor: 'pointer' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--neutral-200)';
+                e.currentTarget.style.transform = 'translateX(2px)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.transform = 'translateX(0)';
               }}
               title="Ver mi perfil"
             >
@@ -205,12 +207,14 @@ export default function Sidebar() {
             <button
               onClick={() => navigate('/app/perfil')}
               className="p-0 rounded-full transition-all duration-200"
-              style={{ backgroundColor: 'transparent' }}
+              style={{ backgroundColor: 'transparent', cursor: 'pointer' }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.transform = 'scale(1.15)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(11, 109, 255, 0.3)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
               title="Ver mi perfil"
             >
