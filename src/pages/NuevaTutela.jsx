@@ -44,8 +44,8 @@ export default function NuevaTutela() {
     tipo_representado: '',
     entidad_accionada: '',
     direccion_entidad: '',
-    representante_legal: '',
     hechos: '',
+    ciudad_de_los_hechos: '',
     derechos_vulnerados: '',
     pretensiones: '',
     fundamentos_derecho: '',
@@ -127,8 +127,8 @@ export default function NuevaTutela() {
         tipo_representado: casoData.tipo_representado || '',
         entidad_accionada: casoData.entidad_accionada || '',
         direccion_entidad: casoData.direccion_entidad || '',
-        representante_legal: casoData.representante_legal || '',
         hechos: casoData.hechos || '',
+        ciudad_de_los_hechos: casoData.ciudad_de_los_hechos || '',
         derechos_vulnerados: casoData.derechos_vulnerados || '',
         pretensiones: casoData.pretensiones || '',
         fundamentos_derecho: casoData.fundamentos_derecho || '',
@@ -790,48 +790,27 @@ export default function NuevaTutela() {
                     placeholder="Ej: 1234567890"
                   />
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--neutral-700)' }}>
-                      Relación con la Persona Representada *
-                    </label>
-                    <select
-                      name="relacion_representado"
-                      value={formData.relacion_representado}
-                      onChange={handleChange}
-                      required={formData.actua_en_representacion}
-                      style={{ borderColor: 'var(--neutral-400)', color: 'var(--neutral-800)' }}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                    >
-                      <option value="">Seleccione...</option>
-                      <option value="madre">Madre</option>
-                      <option value="padre">Padre</option>
-                      <option value="hijo">Hijo/a</option>
-                      <option value="cuidador">Cuidador/a</option>
-                      <option value="apoderado">Apoderado/a</option>
-                      <option value="tutor">Tutor/a legal</option>
-                      <option value="otro">Otro</option>
-                    </select>
-                  </div>
+                  <Input
+                    label="Relación con la Persona Representada *"
+                    type="text"
+                    name="relacion_representado"
+                    value={formData.relacion_representado}
+                    onChange={handleChange}
+                    required={formData.actua_en_representacion}
+                    placeholder="Ej: madre, padre, hermano/a, tío/a, abuelo/a, cuidador/a, apoderado/a..."
+                    helpText="Indica tu relación con la persona que representas"
+                  />
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--neutral-700)' }}>
-                      Tipo de Persona Representada *
-                    </label>
-                    <select
-                      name="tipo_representado"
-                      value={formData.tipo_representado}
-                      onChange={handleChange}
-                      required={formData.actua_en_representacion}
-                      style={{ borderColor: 'var(--neutral-400)', color: 'var(--neutral-800)' }}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                    >
-                      <option value="">Seleccione...</option>
-                      <option value="menor">Menor de edad</option>
-                      <option value="adulto_mayor">Adulto mayor</option>
-                      <option value="persona_discapacidad">Persona con discapacidad</option>
-                      <option value="otro">Otro</option>
-                    </select>
-                  </div>
+                  <Input
+                    label="Tipo de Persona Representada *"
+                    type="text"
+                    name="tipo_representado"
+                    value={formData.tipo_representado}
+                    onChange={handleChange}
+                    required={formData.actua_en_representacion}
+                    placeholder="Ej: menor de edad, adulto mayor, persona con discapacidad..."
+                    helpText="Describe el tipo de persona que representas"
+                  />
                 </div>
               )}
             </div>
@@ -872,15 +851,6 @@ export default function NuevaTutela() {
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <Input
-                  label="Representante Legal"
-                  type="text"
-                  name="representante_legal"
-                  value={formData.representante_legal}
-                  onChange={handleChange}
-                />
-              </div>
             </div>
           </div>
 
@@ -911,6 +881,22 @@ export default function NuevaTutela() {
                   onBlur={(e) => e.currentTarget.style.borderColor = 'var(--neutral-400)'}
                 />
                 <FieldValidationMessages fieldName="hechos" validationResult={validationResult} />
+              </div>
+
+              {/* Campo Ciudad de los Hechos */}
+              <div>
+                <Input
+                  label="Ciudad donde ocurrieron los hechos"
+                  type="text"
+                  name="ciudad_de_los_hechos"
+                  value={formData.ciudad_de_los_hechos}
+                  onChange={handleChange}
+                  placeholder="Ej: Bogotá, Medellín, Cali..."
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--neutral-600)' }}>
+                  Indica solo la ciudad donde ocurrieron los hechos
+                </p>
+                <FieldValidationMessages fieldName="ciudad_de_los_hechos" validationResult={validationResult} />
               </div>
 
               {/* Campo Derechos Vulnerados - Solo para Tutelas */}

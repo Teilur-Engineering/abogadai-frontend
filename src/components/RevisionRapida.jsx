@@ -38,8 +38,8 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
         tipo_representado: caso.tipo_representado || '',
         entidad_accionada: caso.entidad_accionada || '',
         direccion_entidad: caso.direccion_entidad || '',
-        representante_legal: caso.representante_legal || '',
         hechos: caso.hechos || '',
+        ciudad_de_los_hechos: caso.ciudad_de_los_hechos || '',
         derechos_vulnerados: caso.derechos_vulnerados || '',
         pretensiones: caso.pretensiones || '',
         fundamentos_derecho: caso.fundamentos_derecho || '',
@@ -371,12 +371,13 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
             </div>
 
             <div className="mb-3">
-              <label className="text-sm" style={{ color: 'var(--neutral-700)' }}>Representante Legal</label>
+              <label className="text-sm" style={{ color: 'var(--neutral-700)' }}>Ciudad donde ocurrieron los hechos</label>
               <input
                 type="text"
-                name="representante_legal"
-                value={formData.representante_legal}
+                name="ciudad_de_los_hechos"
+                value={formData.ciudad_de_los_hechos}
                 onChange={handleChange}
+                placeholder="Ej: Bogotá, Medellín, Cali..."
                 className="w-full px-3 py-2 rounded mt-1 focus:outline-none focus:ring-2 focus:ring-primary"
                 style={{ backgroundColor: 'white', color: 'var(--neutral-800)', border: '1px solid var(--neutral-300)' }}
               />
@@ -426,21 +427,15 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
                 </div>
                 <div>
                   <label className="text-sm" style={{ color: 'var(--color-primary-dark)' }}>Relación</label>
-                  <select
+                  <input
+                    type="text"
                     name="relacion_representado"
                     value={formData.relacion_representado}
                     onChange={handleChange}
+                    placeholder="Ej: madre, padre, hermano/a, tío/a..."
                     className="w-full px-3 py-2 rounded mt-1 focus:outline-none focus:ring-2 focus:ring-primary"
                     style={{ backgroundColor: 'white', color: 'var(--neutral-800)', border: '1px solid var(--color-primary)' }}
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="madre">Madre</option>
-                    <option value="padre">Padre</option>
-                    <option value="hijo">Hijo/a</option>
-                    <option value="cuidador">Cuidador/a</option>
-                    <option value="apoderado">Apoderado/a</option>
-                    <option value="tutor">Tutor/a legal</option>
-                  </select>
+                  />
                 </div>
               </div>
             </div>
