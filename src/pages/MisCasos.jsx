@@ -26,6 +26,19 @@ export default function MisCasos() {
     cargarCasos();
   }, []);
 
+  // ✅ Marcar casos como vistos al entrar a la página
+  useEffect(() => {
+    const marcarVistos = async () => {
+      try {
+        await casoService.marcarCasosVistos();
+      } catch (error) {
+        console.error('Error marcando casos como vistos:', error);
+      }
+    };
+
+    marcarVistos();
+  }, []);
+
   const cargarCasos = async () => {
     try {
       setLoading(true);

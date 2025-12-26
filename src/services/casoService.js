@@ -130,6 +130,32 @@ export const casoService = {
       throw error;
     }
   },
+
+  /**
+   * 🔔 Verificar si hay casos con novedades sin ver
+   */
+  async tieneNovedades() {
+    try {
+      const response = await api.get('/casos/tiene-novedades');
+      return response.data;
+    } catch (error) {
+      console.error('Error verificando novedades:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ✅ Marcar todos los casos como vistos
+   */
+  async marcarCasosVistos() {
+    try {
+      const response = await api.post('/casos/marcar-vistos');
+      return response.data;
+    } catch (error) {
+      console.error('Error marcando casos como vistos:', error);
+      throw error;
+    }
+  },
 };
 
 export default casoService;

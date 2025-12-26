@@ -3,12 +3,14 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NivelUsuario from './NivelUsuario';
 import UsoSesiones from './UsoSesiones';
+import { casoService } from '../services/casoService';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(true);
+  const [tieneNovedades, setTieneNovedades] = useState(false);
 
   // Ocultar sidebar automáticamente en la ruta de avatar
   const isAvatarRoute = location.pathname === '/app/avatar';
@@ -18,6 +20,44 @@ export default function Sidebar() {
       setIsExpanded(false);
     }
   }, [isAvatarRoute]);
+
+  // 🔔 Polling para verificar novedades cada 60 segundos
+  useEffect(() => {
+    const verificarNovedades = async () => {
+      try {
+        const response = await casoService.tieneNovedades();
+        setTieneNovedades(response.tiene_novedades);
+      } catch (error) {
+        console.error('Error verificando novedades:', error);
+      }
+    };
+
+    // Verificar inmediatamente al montar
+    verificarNovedades();
+
+    // Configurar polling cada 60 segundos
+    const intervalo = setInterval(verificarNovedades, 60000);
+
+    // Limpiar intervalo al desmontar
+    return () => clearInterval(intervalo);
+  }, []);
+
+  // ✅ Actualizar inmediatamente al entrar a "Mis Casos"
+  useEffect(() => {
+    if (location.pathname === '/app/casos') {
+      // Esperar un poquito para que MisCasos marque como vistos primero
+      const timer = setTimeout(async () => {
+        try {
+          const response = await casoService.tieneNovedades();
+          setTieneNovedades(response.tiene_novedades);
+        } catch (error) {
+          console.error('Error verificando novedades:', error);
+        }
+      }, 500); // 500ms de delay
+
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -142,6 +182,7 @@ export default function Sidebar() {
             style={({ isActive }) => ({
               backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
               color: isActive ? 'white' : 'var(--neutral-600)',
+              position: 'relative', // Para que el punto absoluto funcione
             })}
             onMouseEnter={(e) => {
               if (!e.currentTarget.classList.contains('active')) {
@@ -159,7 +200,31 @@ export default function Sidebar() {
           >
             <div className="flex-shrink-0">{item.icon}</div>
             {isExpanded && (
-              <span className="font-medium text-sm">{item.name}</span>
+              <span className="font-medium text-sm flex items-center gap-2">
+                {item.name}
+                {/* 🔴 Punto rojo de notificación para "Mis Casos" */}
+                {item.name === 'Mis Casos' && tieneNovedades && (
+                  <span
+                    className="w-2 h-2 rounded-full animate-pulse"
+                    style={{ backgroundColor: '#ef4444' }}
+                    title="Tienes novedades sin ver"
+                  />
+                )}
+              </span>
+            )}
+            {/* 🔴 Punto rojo cuando está colapsado */}
+            {!isExpanded && item.name === 'Mis Casos' && tieneNovedades && (
+              <span
+                className="absolute w-2.5 h-2.5 rounded-full animate-pulse"
+                style={{
+                  backgroundColor: '#ef4444',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)',
+                  zIndex: 10
+                }}
+                title="Tienes novedades sin ver"
+              />
             )}
           </NavLink>
         ))}
