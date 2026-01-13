@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LiveKitRoom, RoomAudioRenderer, useTracks, useLocalParticipant, useRemoteParticipants } from '@livekit/components-react';
+import { LiveKitRoom, RoomAudioRenderer, useTracks, useLocalParticipant, useRemoteParticipants, useRoomContext } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import livekitService from '../services/livekitService';
 import casoService from '../services/casoService';
@@ -122,6 +122,7 @@ export default function AvatarSession() {
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false);
   const [isAvatarConnected, setIsAvatarConnected] = useState(false);
   const [sessionTime, setSessionTime] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(2 * 60); // ⚠️ TEMPORAL: 2 min para pruebas (cambiar a 15 * 60 en producción)
   const [conversacion, setConversacion] = useState([]);
   const videoContainerRef = useRef(null);
 
@@ -213,12 +214,24 @@ export default function AvatarSession() {
     }
   }, [showWelcomeVideo]);
 
-  // Contador de tiempo de sesión (solo cuando está en sesión)
+  // Contador de tiempo de sesión con límite ⚠️ TEMPORAL: 2 minutos para pruebas (15 min en producción)
   useEffect(() => {
     if (!sessionState.isEnSesion || !isAvatarConnected) return;
 
     const interval = setInterval(() => {
       setSessionTime(prev => prev + 1);
+      setTimeRemaining(prev => {
+        const newTime = prev - 1;
+
+        // Cuando el tiempo se agota completamente (0 segundos)
+        if (newTime <= 0) {
+          console.log('⏱️ Tiempo agotado - Finalizando sesión automáticamente');
+          handleFinalizarSesion();
+          return 0;
+        }
+
+        return newTime;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
@@ -231,6 +244,20 @@ export default function AvatarSession() {
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Formatear tiempo restante
+  const formatTimeRemaining = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Determinar color del tiempo restante
+  const getTimeRemainingColor = (seconds) => {
+    if (seconds <= 60) return 'var(--color-error)'; // Rojo último minuto
+    if (seconds <= 180) return 'var(--color-warning)'; // Amarillo últimos 3 min
+    return 'var(--color-success)'; // Verde normal
   };
 
   // Handler: Iniciar sesión directamente (crear caso + conectar a LiveKit)
@@ -246,6 +273,10 @@ export default function AvatarSession() {
       console.log('🔌 Paso 2: Conectando a LiveKit...');
       const tokenData = await livekitService.conectarSesion(nuevoCasoId);
       console.log('✅ Token obtenido');
+
+      // Resetear timers y estados
+      setSessionTime(0);
+      setTimeRemaining(2 * 60); // ⚠️ TEMPORAL: 2 min para pruebas (cambiar a 15 * 60 en producción)
 
       sessionState.goToEnSesion(tokenData);
     } catch (err) {
@@ -428,14 +459,15 @@ export default function AvatarSession() {
             {sessionState.isEnSesion && (
               <>
                 <div
-                  className="w-2 h-2 rounded-full animate-pulse"
-                  style={{ backgroundColor: 'var(--color-success)' }}
+                  className={`w-2 h-2 rounded-full ${timeRemaining <= 60 ? 'animate-pulse' : ''}`}
+                  style={{ backgroundColor: getTimeRemainingColor(timeRemaining) }}
                 ></div>
                 <span
-                  className="font-mono text-sm"
-                  style={{ color: 'var(--neutral-800)' }}
+                  className="font-mono text-sm font-semibold"
+                  style={{ color: getTimeRemainingColor(timeRemaining) }}
+                  title={`Tiempo transcurrido: ${formatSessionTime(sessionTime)}`}
                 >
-                  {formatSessionTime(sessionTime)}
+                  {formatTimeRemaining(timeRemaining)} restantes
                 </span>
               </>
             )}
