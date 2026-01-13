@@ -122,7 +122,7 @@ export default function AvatarSession() {
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false);
   const [isAvatarConnected, setIsAvatarConnected] = useState(false);
   const [sessionTime, setSessionTime] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(2 * 60); // ⚠️ TEMPORAL: 2 min para pruebas (cambiar a 15 * 60 en producción)
+  const [timeRemaining, setTimeRemaining] = useState(15 * 60); // 15 minutos para producción
   const [conversacion, setConversacion] = useState([]);
   const videoContainerRef = useRef(null);
 
@@ -214,7 +214,7 @@ export default function AvatarSession() {
     }
   }, [showWelcomeVideo]);
 
-  // Contador de tiempo de sesión con límite ⚠️ TEMPORAL: 2 minutos para pruebas (15 min en producción)
+  // Contador de tiempo de sesión con límite de 15 minutos
   useEffect(() => {
     if (!sessionState.isEnSesion || !isAvatarConnected) return;
 
@@ -276,7 +276,7 @@ export default function AvatarSession() {
 
       // Resetear timers y estados
       setSessionTime(0);
-      setTimeRemaining(2 * 60); // ⚠️ TEMPORAL: 2 min para pruebas (cambiar a 15 * 60 en producción)
+      setTimeRemaining(15 * 60); // 15 minutos para producción
 
       sessionState.goToEnSesion(tokenData);
     } catch (err) {
