@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { SessionProvider } from './context/SessionContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import Login from './pages/Login';
@@ -18,6 +19,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
+          <SessionProvider>
           <Routes>
             {/* Redirección de la raíz a login */}
             <Route path="/" element={<Navigate to="/login" replace />} />
@@ -93,6 +95,7 @@ function App() {
             {/* Ruta 404 */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
+          </SessionProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

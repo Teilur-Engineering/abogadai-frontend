@@ -17,7 +17,7 @@ import Modal from './Modal';
  * - Validar campos bloqueantes antes de generar
  * - Generar documento desde la misma interfaz
  */
-export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated, onDocumentoGenerado }) {
+export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated, onDocumentoGenerado, onAbandonar }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [formData, setFormData] = useState({});
@@ -258,6 +258,31 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
                   ? '✓ Listo para generar'
                   : `${validacion.bloqueantes_faltantes.length} campos obligatorios faltantes`}
               </span>
+            )}
+            {/* Botón cancelar sesión */}
+            {onAbandonar && (
+              <button
+                onClick={onAbandonar}
+                className="text-xs px-3 py-1 rounded-full flex items-center gap-1 transition-colors"
+                style={{
+                  backgroundColor: 'var(--neutral-300)',
+                  color: 'var(--neutral-700)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-error)';
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--neutral-300)';
+                  e.currentTarget.style.color = 'var(--neutral-700)';
+                }}
+                title="Cancelar y eliminar este caso"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancelar sesión
+              </button>
             )}
           </div>
         </div>

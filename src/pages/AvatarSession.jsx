@@ -5,10 +5,11 @@ import { Track } from 'livekit-client';
 import livekitService from '../services/livekitService';
 import casoService from '../services/casoService';
 import { useAuth } from '../context/AuthContext';
+import { useSession } from '../context/SessionContext';
 import { useSessionState, SESSION_STATES } from '../hooks/useSessionState';
 import TranscriptPanel from '../components/TranscriptPanel';
 import RevisionRapida from '../components/RevisionRapida';
-// ModalConfirmarSesion eliminado - ahora inicia automáticamente
+import ModalConfirmarSalida from '../components/ModalConfirmarSalida';
 
 // Componente para detectar participantes remotos (avatar)
 function AvatarDetector({ onAvatarConnected }) {
@@ -113,7 +114,11 @@ export default function AvatarSession() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const sessionState = useSessionState();
+  const sessionContext = useSession();
   const isInitializingRef = useRef(false);
+
+  // Estado para modal de confirmación de abandono
+  const [mostrarModalAbandono, setMostrarModalAbandono] = useState(false);
 
   // Estados del componente
   const [casoId, setCasoId] = useState(null);
@@ -138,6 +143,71 @@ export default function AvatarSession() {
     // El caso se creará cuando el usuario presione "Iniciar Sesión"
     sessionState.goToPreLlamada();
   }, []);
+
+  // Sincronizar estado local con el contexto global
+  // Esto permite que otros componentes (como Sidebar) sepan el estado de la sesión
+  useEffect(() => {
+    sessionContext.actualizarEstado(sessionState.currentState);
+  }, [sessionState.currentState]);
+
+  // Sincronizar casoId con el contexto global
+  useEffect(() => {
+    sessionContext.establecerCasoId(casoId);
+  }, [casoId]);
+
+  // Interceptar cierre de pestaña/navegador cuando hay sesión activa
+  // Muestra la confirmación nativa del navegador
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      // Solo mostrar advertencia si hay sesión activa
+      if (sessionState.isEnSesion || sessionState.isRevision) {
+        // Mensaje estándar (los navegadores modernos ignoran el mensaje personalizado)
+        const message = 'Tienes una sesión activa. Si cierras esta página, perderás todo el progreso y el caso será eliminado.';
+        e.preventDefault();
+        e.returnValue = message; // Para Chrome
+        return message; // Para otros navegadores
+      }
+    };
+
+    // Agregar listener
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [sessionState.isEnSesion, sessionState.isRevision]);
+
+  // Limpiar caso huérfano si el usuario cerró la pestaña y vuelve
+  // (El caso quedará en estado TEMPORAL en la BD, se puede limpiar con cron o al iniciar nueva sesión)
+  useEffect(() => {
+    const limpiarCasoHuerfano = async () => {
+      // Verificar si hay un caso huérfano guardado en sessionStorage
+      const casoHuerfanoId = sessionStorage.getItem('casoEnProgreso');
+      if (casoHuerfanoId && sessionState.isPreLlamada) {
+        console.log('🧹 Detectado caso huérfano, intentando limpiar:', casoHuerfanoId);
+        try {
+          await casoService.eliminarCaso(parseInt(casoHuerfanoId));
+          console.log('✅ Caso huérfano eliminado');
+        } catch (error) {
+          // Si falla (404 u otro), no es crítico
+          console.log('ℹ️ No se pudo eliminar caso huérfano (puede que ya no exista)');
+        }
+        sessionStorage.removeItem('casoEnProgreso');
+      }
+    };
+
+    limpiarCasoHuerfano();
+  }, []);
+
+  // Guardar casoId en sessionStorage para detectar casos huérfanos
+  useEffect(() => {
+    if (casoId && (sessionState.isEnSesion || sessionState.isRevision)) {
+      sessionStorage.setItem('casoEnProgreso', casoId.toString());
+    } else if (sessionState.isPreLlamada) {
+      sessionStorage.removeItem('casoEnProgreso');
+    }
+  }, [casoId, sessionState.isEnSesion, sessionState.isRevision, sessionState.isPreLlamada]);
 
   // Reproducir video de bienvenida (solo si viene de login, no en recargas)
   useEffect(() => {
@@ -310,8 +380,13 @@ export default function AvatarSession() {
     }
   };
 
-  // Handler: Abandonar llamada (eliminar caso y salir)
-  const handleAbandonarLlamada = async () => {
+  // Handler: Mostrar modal de confirmación antes de abandonar
+  const handleClickAbandonar = () => {
+    setMostrarModalAbandono(true);
+  };
+
+  // Handler: Confirmar abandono (eliminar caso y salir)
+  const handleConfirmarAbandono = async () => {
     try {
       console.log('🚪 Abandonando llamada...');
 
@@ -344,6 +419,9 @@ export default function AvatarSession() {
       // Paso 3: Resetear el estado de la sesión a PRE_LLAMADA
       console.log('🔄 Reseteando estado de sesión...');
       sessionState.reset();
+      sessionContext.resetearEstado();
+      sessionStorage.removeItem('casoEnProgreso');
+      setMostrarModalAbandono(false);
       console.log('✅ Estado reseteado - Volviendo a pantalla inicial');
 
       // Nota: No necesitamos navigate() porque ya estamos en /app/avatar
@@ -352,7 +430,15 @@ export default function AvatarSession() {
       console.error('❌ Error abandonando llamada:', err);
       // Resetear de todos modos e intentar volver a la interfaz principal
       sessionState.reset();
+      sessionContext.resetearEstado();
+      sessionStorage.removeItem('casoEnProgreso');
+      setMostrarModalAbandono(false);
     }
+  };
+
+  // Handler: Cancelar abandono
+  const handleCancelarAbandono = () => {
+    setMostrarModalAbandono(false);
   };
 
   // Handler: Actualizar caso después de edición
@@ -363,6 +449,10 @@ export default function AvatarSession() {
   // Handler: Documento generado
   const handleDocumentoGenerado = (casoConDocumento) => {
     sessionState.updateCasoData(casoConDocumento);
+    // Limpiar el sessionStorage porque el caso ya no está en progreso
+    sessionStorage.removeItem('casoEnProgreso');
+    // Resetear el contexto global
+    sessionContext.resetearEstado();
     console.log('✅ Documento generado exitosamente');
   };
 
@@ -722,7 +812,7 @@ export default function AvatarSession() {
                   </button>
 
                   <button
-                    onClick={handleAbandonarLlamada}
+                    onClick={handleClickAbandonar}
                     className="text-white px-4 py-3 rounded-lg transition-all duration-200 text-sm font-semibold shadow-lg flex items-center gap-2"
                     style={{ backgroundColor: 'var(--neutral-600)', border: '2px solid var(--neutral-500)' }}
                     onMouseEnter={(e) => {
@@ -818,12 +908,27 @@ export default function AvatarSession() {
               conversacion={conversacion}
               onCasoUpdated={handleCasoUpdated}
               onDocumentoGenerado={handleDocumentoGenerado}
+              onAbandonar={handleClickAbandonar}
             />
           </div>
         )}
       </div>
 
-      {/* Modal de confirmación eliminado - ahora inicia automáticamente */}
+      {/* Modal de confirmación para abandonar sesión */}
+      <ModalConfirmarSalida
+        isOpen={mostrarModalAbandono}
+        onConfirmar={handleConfirmarAbandono}
+        onCancelar={handleCancelarAbandono}
+        titulo="¿Abandonar la sesión?"
+        mensaje={
+          sessionState.isEnSesion
+            ? "Estás en medio de una sesión con Sofía. Si sales ahora, perderás toda la conversación y el caso será eliminado."
+            : "Estás revisando los datos de tu caso. Si sales ahora, perderás todo el progreso y el caso será eliminado."
+        }
+        textoConfirmar="Sí, salir y eliminar"
+        textoCancelar="Continuar"
+        isLoading={sessionContext.isAbandonando}
+      />
     </div>
   );
 }
