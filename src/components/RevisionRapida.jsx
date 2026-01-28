@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import casoService from '../services/casoService';
-import perfilService from '../services/perfilService';
 import api from '../services/api';
 import Button from './Button';
 import Modal from './Modal';
@@ -107,22 +106,9 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
     try {
       setGuardando(true);
 
-      // Actualizar el caso
+      // Actualizar el caso (sin modificar el perfil del usuario)
       const casoActualizado = await casoService.actualizarCaso(caso.id, formData);
       onCasoUpdated?.(casoActualizado);
-
-      // Actualizar el perfil con los datos del solicitante
-      // Solo se envían los campos que están en el formulario
-      const perfilUpdate = {};
-      if (formData.nombre_solicitante) perfilUpdate.nombre = formData.nombre_solicitante;
-      if (formData.identificacion_solicitante) perfilUpdate.identificacion = formData.identificacion_solicitante;
-      if (formData.direccion_solicitante) perfilUpdate.direccion = formData.direccion_solicitante;
-      if (formData.telefono_solicitante) perfilUpdate.telefono = formData.telefono_solicitante;
-
-      // Solo actualizar si hay campos para actualizar
-      if (Object.keys(perfilUpdate).length > 0) {
-        await perfilService.actualizarPerfil(perfilUpdate);
-      }
 
       await cargarValidacion(); // Recargar validación después de guardar
     } catch (error) {
@@ -306,7 +292,7 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
-                Los cambios se guardarán en tu perfil automáticamente (excepto email)
+                Los cambios solo aplican a este documento (tu perfil no se modifica)
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
