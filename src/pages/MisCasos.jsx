@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import casoService from '../services/casoService';
@@ -10,6 +10,7 @@ import SolicitudReembolso from '../components/SolicitudReembolso';
 
 export default function MisCasos() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const toast = useToast();
   const [casos, setCasos] = useState([]);
@@ -21,6 +22,41 @@ export default function MisCasos() {
   // Estados para solicitud de reembolso
   const [showModalReembolso, setShowModalReembolso] = useState(false);
   const [casoParaReembolso, setCasoParaReembolso] = useState(null);
+
+  // Manejar parámetros de retorno de pago Vita
+  useEffect(() => {
+    const pagoStatus = searchParams.get('pago');
+    const casoId = searchParams.get('caso_id');
+
+    if (pagoStatus) {
+      // Limpiar parámetros de la URL
+      setSearchParams({});
+
+      // Mostrar mensaje según el resultado
+      switch (pagoStatus) {
+        case 'exitoso':
+          toast.success('¡Pago completado exitosamente! Tu documento ha sido desbloqueado.');
+          // Si hay caso_id, redirigir a ver el documento
+          if (casoId) {
+            setTimeout(() => {
+              navigate(`/app/tutela/${casoId}?mode=view`);
+            }, 1500);
+          }
+          break;
+        case 'cancelado':
+          toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
+          break;
+        case 'error':
+          toast.error('Hubo un error procesando el pago. Por favor, intenta de nuevo.');
+          break;
+        case 'pendiente':
+          toast.info('Tu pago está pendiente de confirmación. Te notificaremos cuando se complete.');
+          break;
+        default:
+          break;
+      }
+    }
+  }, [searchParams, setSearchParams, toast, navigate]);
 
   useEffect(() => {
     cargarCasos();
