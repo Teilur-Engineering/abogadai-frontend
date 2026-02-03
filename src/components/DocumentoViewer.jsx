@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { casoService } from '../services/casoService';
 import Button from './Button';
 import { useToast } from '../context/ToastContext';
+
+// Detectar si estamos en modo desarrollo
+const IS_DEVELOPMENT = import.meta.env.DEV || window.location.hostname === 'localhost';
 
 /**
  * Procesa el texto markdown del documento y lo convierte a HTML con estilos
@@ -76,6 +80,9 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
   const [loading, setLoading] = useState(true);
   const [procesandoPago, setProcesandoPago] = useState(false);
   const [mostrarModalPago, setMostrarModalPago] = useState(false);
+  const [mostrarOpcionesPago, setMostrarOpcionesPago] = useState(false);
+  const [verificandoPago, setVerificandoPago] = useState(false);
+  const [intentosVerificacion, setIntentosVerificacion] = useState(0);
   const [datosPago, setDatosPago] = useState({
     numeroTarjeta: '',
     fechaVencimiento: '',
@@ -83,10 +90,87 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
     nombreTitular: ''
   });
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const MAX_INTENTOS_VERIFICACION = 20; // 20 intentos * 3 segundos = 60 segundos máximo
+  const INTERVALO_VERIFICACION = 3000; // 3 segundos
+
+  // Manejar resultado de pago desde Vita Wallet
+  useEffect(() => {
+    const estadoPago = searchParams.get('pago');
+
+    if (estadoPago) {
+      // Limpiar query params
+      setSearchParams({}, { replace: true });
+
+      switch (estadoPago) {
+        case 'exitoso':
+        case 'pendiente':
+          // Tanto exitoso como pendiente inician verificación
+          // porque el webhook puede no haber llegado aún
+          iniciarVerificacionPago();
+          break;
+        case 'cancelado':
+          toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
+          break;
+        case 'error':
+          toast.error('Hubo un error procesando el pago. Por favor intenta de nuevo.');
+          break;
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     cargarDocumento();
   }, [casoId]);
+
+  // Polling para verificar estado del pago
+  useEffect(() => {
+    let intervalId;
+
+    if (verificandoPago && intentosVerificacion < MAX_INTENTOS_VERIFICACION) {
+      intervalId = setInterval(async () => {
+        try {
+          const estado = await casoService.obtenerEstadoPago(casoId);
+
+          if (estado.documento_desbloqueado || estado.estado === 'EXITOSO') {
+            // Pago confirmado
+            setVerificandoPago(false);
+            setIntentosVerificacion(0);
+            toast.success('¡Pago confirmado! El documento ha sido desbloqueado.');
+            cargarDocumento();
+            if (onPagoExitoso) onPagoExitoso();
+          } else if (estado.estado === 'FALLIDO') {
+            // Pago falló
+            setVerificandoPago(false);
+            setIntentosVerificacion(0);
+            toast.error('El pago no pudo ser procesado. Por favor intenta de nuevo.');
+          } else {
+            // Sigue pendiente, incrementar intentos
+            setIntentosVerificacion(prev => prev + 1);
+          }
+        } catch (error) {
+          console.error('Error verificando estado de pago:', error);
+          setIntentosVerificacion(prev => prev + 1);
+        }
+      }, INTERVALO_VERIFICACION);
+    } else if (intentosVerificacion >= MAX_INTENTOS_VERIFICACION) {
+      // Tiempo agotado
+      setVerificandoPago(false);
+      setIntentosVerificacion(0);
+      toast.warning('La verificación del pago está tomando más tiempo de lo esperado. Por favor recarga la página en unos minutos.');
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [verificandoPago, intentosVerificacion, casoId]);
+
+  // Iniciar verificación de pago con modal
+  const iniciarVerificacionPago = () => {
+    setVerificandoPago(true);
+    setIntentosVerificacion(0);
+  };
 
   const cargarDocumento = async () => {
     try {
@@ -117,6 +201,28 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
     return limpio;
   };
 
+  // Pagar con Vita Wallet (producción)
+  const handlePagarConVita = async () => {
+    setProcesandoPago(true);
+
+    try {
+      const response = await casoService.iniciarPagoVita(casoId);
+
+      if (response.payment_url) {
+        // Redirigir a Vita Wallet
+        window.location.href = response.payment_url;
+      } else {
+        throw new Error('No se recibió URL de pago');
+      }
+    } catch (error) {
+      console.error('Error iniciando pago con Vita:', error);
+      const mensaje = error.response?.data?.detail || 'Error al conectar con la pasarela de pago';
+      toast.error(mensaje);
+      setProcesandoPago(false);
+    }
+  };
+
+  // Simular pago (solo desarrollo)
   const handleSimularPago = async (e) => {
     e.preventDefault();
 
@@ -281,11 +387,19 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
 
                   {/* Botón de pago */}
                   <Button
-                    onClick={() => setMostrarModalPago(true)}
+                    onClick={() => setMostrarOpcionesPago(true)}
                     variant="primary"
                     className="w-full"
+                    disabled={procesandoPago}
                   >
-                    Desbloquear Documento
+                    {procesandoPago ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Procesando...
+                      </span>
+                    ) : (
+                      'Desbloquear Documento'
+                    )}
                   </Button>
 
                   {/* Beneficios */}
@@ -348,6 +462,157 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
         </div>
       )}
 
+      {/* Modal de Opciones de Pago */}
+      {mostrarOpcionesPago && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative animate-scaleIn">
+            {/* Botón cerrar */}
+            <button
+              onClick={() => setMostrarOpcionesPago(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={procesandoPago}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Desbloquear Documento</h2>
+              <p className="text-gray-600">Elige tu método de pago preferido</p>
+            </div>
+
+            {/* Resumen */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-200">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-gray-600">
+                  {documento?.tipo_documento === 'TUTELA' ? 'Acción de Tutela' : 'Derecho de Petición'}
+                </span>
+                <span className="font-semibold text-gray-900">
+                  ${documento?.precio?.toLocaleString('es-CO')} COP
+                </span>
+              </div>
+            </div>
+
+            {/* Opciones de pago */}
+            <div className="space-y-3">
+              {/* Vita Wallet - Opción principal */}
+              <button
+                onClick={handlePagarConVita}
+                disabled={procesandoPago}
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+              >
+                {procesandoPago ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Conectando con pasarela...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    Pagar con Vita Wallet
+                  </>
+                )}
+              </button>
+
+              {/* Métodos disponibles */}
+              <div className="flex items-center justify-center gap-4 py-2">
+                <span className="text-xs text-gray-500">Nequi</span>
+                <span className="text-gray-300">•</span>
+                <span className="text-xs text-gray-500">PSE</span>
+                <span className="text-gray-300">•</span>
+                <span className="text-xs text-gray-500">Bancolombia</span>
+                <span className="text-gray-300">•</span>
+                <span className="text-xs text-gray-500">Daviplata</span>
+              </div>
+
+              {/* Separador con opción de desarrollo */}
+              {IS_DEVELOPMENT && (
+                <>
+                  <div className="relative py-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-200"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">o en modo desarrollo</span>
+                    </div>
+                  </div>
+
+                  {/* Botón de simulación (solo desarrollo) */}
+                  <button
+                    onClick={() => {
+                      setMostrarOpcionesPago(false);
+                      setMostrarModalPago(true);
+                    }}
+                    disabled={procesandoPago}
+                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl transition-colors disabled:opacity-50 border border-gray-300"
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Simular Pago (Dev)
+                    </span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Seguridad */}
+            <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Pago seguro procesado por Vita Wallet
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Verificación de Pago */}
+      {verificandoPago && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center animate-scaleIn">
+            {/* Spinner */}
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
+                <div className="w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+              </div>
+            </div>
+
+            {/* Texto */}
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              Verificando pago...
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Estamos confirmando tu pago con la pasarela. Esto puede tomar unos segundos.
+            </p>
+
+            {/* Barra de progreso */}
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(intentosVerificacion / MAX_INTENTOS_VERIFICACION) * 100}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-gray-500">
+              {intentosVerificacion < MAX_INTENTOS_VERIFICACION
+                ? `Intento ${intentosVerificacion + 1} de ${MAX_INTENTOS_VERIFICACION}`
+                : 'Finalizando...'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Pasarela de Pago Simulada */}
       {mostrarModalPago && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
@@ -377,12 +642,18 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
             {/* Resumen de compra */}
             <div className="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-200">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600">Documento legal completo</span>
-                <span className="font-semibold text-gray-900">$50,000</span>
+                <span className="text-gray-600">
+                  {documento?.tipo_documento === 'TUTELA' ? 'Acción de Tutela' : 'Derecho de Petición'}
+                </span>
+                <span className="font-semibold text-gray-900">
+                  ${documento?.precio?.toLocaleString('es-CO')}
+                </span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-gray-300">
                 <span className="font-semibold text-gray-900">Total a pagar</span>
-                <span className="text-2xl font-bold text-blue-600">$50,000 COP</span>
+                <span className="text-2xl font-bold text-blue-600">
+                  ${documento?.precio?.toLocaleString('es-CO')} COP
+                </span>
               </div>
             </div>
 

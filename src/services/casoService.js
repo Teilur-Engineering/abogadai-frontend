@@ -119,7 +119,7 @@ export const casoService = {
   },
 
   /**
-   * Simular pago y desbloquear documento
+   * Simular pago y desbloquear documento (solo desarrollo)
    */
   async simularPago(casoId) {
     try {
@@ -127,6 +127,39 @@ export const casoService = {
       return response.data;
     } catch (error) {
       console.error('Error simulando pago:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Iniciar pago con Vita Wallet
+   * Retorna URL de checkout para redirigir al usuario
+   *
+   * @param {number} casoId - ID del caso a pagar
+   * @returns {Promise<{payment_url: string, pago_id: number, monto: number}>}
+   */
+  async iniciarPagoVita(casoId) {
+    try {
+      const response = await api.post(`/casos/${casoId}/pago/iniciar`);
+      return response.data;
+    } catch (error) {
+      console.error('Error iniciando pago Vita:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener estado del pago de un caso
+   *
+   * @param {number} casoId - ID del caso
+   * @returns {Promise<{tiene_pago: boolean, estado: string, documento_desbloqueado: boolean}>}
+   */
+  async obtenerEstadoPago(casoId) {
+    try {
+      const response = await api.get(`/casos/${casoId}/pago/estado`);
+      return response.data;
+    } catch (error) {
+      console.error('Error obteniendo estado de pago:', error);
       throw error;
     }
   },
