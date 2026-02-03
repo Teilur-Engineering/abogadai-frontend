@@ -98,36 +98,62 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
   const MAX_INTENTOS_VERIFICACION = 30; // 30 intentos * 3 segundos = 90 segundos máximo
   const INTERVALO_VERIFICACION = 3000; // 3 segundos
 
-  // Manejar resultado de pago desde Vita Wallet (solo se ejecuta una vez)
+  // Key para localStorage del pago en proceso
+  const PAGO_EN_PROCESO_KEY = `pago_en_proceso_${casoId}`;
+
+  // Verificar si hay pago en proceso al montar el componente
   useEffect(() => {
     // Evitar procesamiento múltiple
     if (pagoProcessedRef.current) return;
 
+    // 1. Primero verificar parámetro de URL (si Vita lo pasa)
     const estadoPago = searchParams.get('pago');
 
-    if (estadoPago) {
+    // 2. También verificar localStorage (backup si Vita no pasa parámetro)
+    const pagoEnProcesoTimestamp = localStorage.getItem(PAGO_EN_PROCESO_KEY);
+
+    // Verificar si el pago en localStorage no ha expirado (10 minutos máximo)
+    const TIEMPO_EXPIRACION = 10 * 60 * 1000; // 10 minutos en ms
+    let pagoEnProcesoValido = false;
+    if (pagoEnProcesoTimestamp) {
+      const tiempoTranscurrido = Date.now() - parseInt(pagoEnProcesoTimestamp);
+      if (tiempoTranscurrido < TIEMPO_EXPIRACION) {
+        pagoEnProcesoValido = true;
+      } else {
+        // Expiró, limpiar
+        localStorage.removeItem(PAGO_EN_PROCESO_KEY);
+      }
+    }
+
+    if (estadoPago || pagoEnProcesoValido) {
       pagoProcessedRef.current = true;
 
-      // Limpiar query params de la URL sin causar re-render
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+      // Limpiar query params de la URL
+      if (estadoPago) {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
 
-      switch (estadoPago) {
+      // Determinar acción basada en el estado
+      const estado = estadoPago || 'pendiente'; // Si viene de localStorage, asumir pendiente
+
+      switch (estado) {
         case 'exitoso':
         case 'pendiente':
-          // Tanto exitoso como pendiente inician verificación
-          // porque el webhook puede no haber llegado aún
+          // Iniciar verificación (el localStorage se limpia cuando confirma/falla)
           iniciarVerificacionPago();
           break;
         case 'cancelado':
+          localStorage.removeItem(PAGO_EN_PROCESO_KEY);
           toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
           break;
         case 'error':
+          localStorage.removeItem(PAGO_EN_PROCESO_KEY);
           toast.error('Hubo un error procesando el pago. Por favor intenta de nuevo.');
           break;
       }
     }
-  }, [searchParams, toast]);
+  }, [casoId, searchParams, toast, PAGO_EN_PROCESO_KEY]);
 
   useEffect(() => {
     cargarDocumento();
@@ -143,14 +169,16 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
           const estado = await casoService.obtenerEstadoPago(casoId);
 
           if (estado.documento_desbloqueado || estado.estado === 'EXITOSO') {
-            // Pago confirmado
+            // Pago confirmado - limpiar localStorage
+            localStorage.removeItem(PAGO_EN_PROCESO_KEY);
             setVerificandoPago(false);
             setIntentosVerificacion(0);
             toast.success('¡Pago confirmado! El documento ha sido desbloqueado.');
             cargarDocumento();
             if (onPagoExitoso) onPagoExitoso();
           } else if (estado.estado === 'FALLIDO') {
-            // Pago falló
+            // Pago falló - limpiar localStorage
+            localStorage.removeItem(PAGO_EN_PROCESO_KEY);
             setVerificandoPago(false);
             setIntentosVerificacion(0);
             toast.error('El pago no pudo ser procesado. Por favor intenta de nuevo.');
@@ -164,7 +192,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
         }
       }, INTERVALO_VERIFICACION);
     } else if (intentosVerificacion >= MAX_INTENTOS_VERIFICACION) {
-      // Tiempo agotado
+      // Tiempo agotado - NO limpiar localStorage para que pueda reintentar al recargar
       setVerificandoPago(false);
       setIntentosVerificacion(0);
       toast.warning('La verificación del pago está tomando más tiempo de lo esperado. Por favor recarga la página en unos minutos.');
@@ -173,7 +201,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [verificandoPago, intentosVerificacion, casoId]);
+  }, [verificandoPago, intentosVerificacion, casoId, PAGO_EN_PROCESO_KEY]);
 
   // Iniciar verificación de pago con modal
   const iniciarVerificacionPago = () => {
@@ -218,6 +246,10 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
       const response = await casoService.iniciarPagoVita(casoId);
 
       if (response.payment_url) {
+        // Guardar en localStorage que hay un pago en proceso
+        // Esto sirve como backup si Vita no pasa los parámetros de URL
+        localStorage.setItem(PAGO_EN_PROCESO_KEY, Date.now().toString());
+
         // Redirigir a Vita Wallet
         window.location.href = response.payment_url;
       } else {
