@@ -78,7 +78,7 @@ const procesarDocumento = (texto) => {
 export default function DocumentoViewer({ casoId, onPagoExitoso }) {
   // Key para localStorage - definir primero para usar en inicialización
   const PAGO_EN_PROCESO_KEY = `pago_en_proceso_${String(casoId)}`;
-  const TIEMPO_EXPIRACION = 10 * 60 * 1000; // 10 minutos en ms
+  const TIEMPO_EXPIRACION = 30 * 60 * 1000; // 30 minutos en ms
 
   // Verificar localStorage ANTES del primer render para inicializar correctamente
   const [verificandoPago, setVerificandoPago] = useState(() => {
@@ -86,8 +86,8 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
       const timestamp = localStorage.getItem(`pago_en_proceso_${String(casoId)}`);
       if (!timestamp) return false;
       const tiempoTranscurrido = Date.now() - parseInt(timestamp);
-      if (tiempoTranscurrido < 10 * 60 * 1000) {
-        // Hay un pago en proceso válido
+      if (tiempoTranscurrido < 30 * 60 * 1000) {
+        // Hay un pago en proceso válido (30 minutos)
         return true;
       } else {
         // Expiró, limpiar
@@ -114,7 +114,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
   const toast = useToast();
   const [searchParams] = useSearchParams();
 
-  const MAX_INTENTOS_VERIFICACION = 30; // 30 intentos * 3 segundos = 90 segundos máximo
+  const MAX_INTENTOS_VERIFICACION = 600; // 600 intentos * 3 segundos = 30 minutos máximo
   const INTERVALO_VERIFICACION = 3000; // 3 segundos
 
   // Manejar parámetros de URL (cancelado/error) - el localStorage ya se verificó arriba
@@ -174,10 +174,10 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
         }
       }, INTERVALO_VERIFICACION);
     } else if (intentosVerificacion >= MAX_INTENTOS_VERIFICACION) {
-      // Tiempo agotado - NO limpiar localStorage para que pueda reintentar al recargar
-      setVerificandoPago(false);
-      setIntentosVerificacion(0);
-      toast.warning('La verificación del pago está tomando más tiempo de lo esperado. Por favor recarga la página en unos minutos.');
+      // Tiempo agotado - NO limpiar localStorage, mantener verificandoPago en true
+      // para que siga mostrando el mensaje de procesando (no el botón de pagar)
+      setIntentosVerificacion(0); // Reiniciar contador para seguir intentando
+      toast.info('La verificación está tardando más de lo esperado. Puedes recargar la página o seguir esperando.');
     }
 
     return () => {
@@ -385,33 +385,25 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
                           </div>
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                          Verificando Pago
+                          Procesando Pago
                         </h3>
                         <p className="text-gray-600 mb-1">
-                          Estamos confirmando tu pago con la pasarela
+                          Estamos verificando tu pago con la pasarela
                         </p>
                         <p className="text-sm text-gray-500">
-                          Esto puede tomar unos segundos...
+                          Esto puede tomar unos minutos...
                         </p>
                       </div>
 
-                      {/* Barra de progreso */}
-                      <div className="bg-gray-100 rounded-lg p-4 mb-4">
-                        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${(intentosVerificacion / MAX_INTENTOS_VERIFICACION) * 100}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-sm text-center text-gray-600">
-                          {intentosVerificacion < MAX_INTENTOS_VERIFICACION
-                            ? `Verificando... (${Math.round((intentosVerificacion / MAX_INTENTOS_VERIFICACION) * 100)}%)`
-                            : 'Finalizando...'}
+                      {/* Mensaje informativo */}
+                      <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
+                        <p className="text-sm text-center text-blue-800">
+                          El documento se desbloqueará automáticamente cuando se confirme el pago.
                         </p>
                       </div>
 
                       <p className="text-xs text-gray-500 text-center">
-                        No cierres esta ventana mientras verificamos tu pago
+                        Puedes esperar aquí o volver más tarde. Si sales, el documento se desbloqueará cuando vuelvas (si el pago ya fue confirmado).
                       </p>
                     </>
                   ) : (
