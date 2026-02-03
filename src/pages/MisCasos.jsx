@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -10,7 +10,7 @@ import SolicitudReembolso from '../components/SolicitudReembolso';
 
 export default function MisCasos() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const toast = useToast();
   const [casos, setCasos] = useState([]);
@@ -23,40 +23,40 @@ export default function MisCasos() {
   const [showModalReembolso, setShowModalReembolso] = useState(false);
   const [casoParaReembolso, setCasoParaReembolso] = useState(null);
 
-  // Manejar parámetros de retorno de pago Vita
+  // Ref para evitar procesar parámetros de pago múltiples veces
+  const pagoProcessedRef = useRef(false);
+
+  // Manejar parámetros de retorno de pago Vita (solo se ejecuta una vez)
   useEffect(() => {
+    // Evitar procesamiento múltiple
+    if (pagoProcessedRef.current) return;
+
     const pagoStatus = searchParams.get('pago');
     const casoId = searchParams.get('caso_id');
 
-    if (pagoStatus) {
-      // Limpiar parámetros de la URL
-      setSearchParams({});
+    if (pagoStatus && casoId) {
+      pagoProcessedRef.current = true;
 
-      // Mostrar mensaje según el resultado
+      // Redirigir inmediatamente al caso con el parámetro de pago
+      // El componente DocumentoViewer manejará el estado de verificación
+      navigate(`/app/tutela/${casoId}?mode=view&pago=${pagoStatus}`, { replace: true });
+    } else if (pagoStatus) {
+      pagoProcessedRef.current = true;
+      // Si no hay caso_id, mostrar mensaje aquí
       switch (pagoStatus) {
-        case 'exitoso':
-          toast.success('¡Pago completado exitosamente! Tu documento ha sido desbloqueado.');
-          // Si hay caso_id, redirigir a ver el documento
-          if (casoId) {
-            setTimeout(() => {
-              navigate(`/app/tutela/${casoId}?mode=view`);
-            }, 1500);
-          }
-          break;
         case 'cancelado':
           toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
           break;
         case 'error':
           toast.error('Hubo un error procesando el pago. Por favor, intenta de nuevo.');
           break;
-        case 'pendiente':
-          toast.info('Tu pago está pendiente de confirmación. Te notificaremos cuando se complete.');
-          break;
         default:
           break;
       }
+      // Limpiar URL
+      window.history.replaceState({}, '', '/app/casos');
     }
-  }, [searchParams, setSearchParams, toast, navigate]);
+  }, [searchParams, navigate, toast]);
 
   useEffect(() => {
     cargarCasos();

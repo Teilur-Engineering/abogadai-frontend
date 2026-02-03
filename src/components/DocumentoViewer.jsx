@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { casoService } from '../services/casoService';
 import Button from './Button';
@@ -90,18 +90,27 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
     nombreTitular: ''
   });
   const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
-  const MAX_INTENTOS_VERIFICACION = 20; // 20 intentos * 3 segundos = 60 segundos máximo
+  // Ref para evitar procesar el pago múltiples veces
+  const pagoProcessedRef = useRef(false);
+
+  const MAX_INTENTOS_VERIFICACION = 30; // 30 intentos * 3 segundos = 90 segundos máximo
   const INTERVALO_VERIFICACION = 3000; // 3 segundos
 
-  // Manejar resultado de pago desde Vita Wallet
+  // Manejar resultado de pago desde Vita Wallet (solo se ejecuta una vez)
   useEffect(() => {
+    // Evitar procesamiento múltiple
+    if (pagoProcessedRef.current) return;
+
     const estadoPago = searchParams.get('pago');
 
     if (estadoPago) {
-      // Limpiar query params
-      setSearchParams({}, { replace: true });
+      pagoProcessedRef.current = true;
+
+      // Limpiar query params de la URL sin causar re-render
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
 
       switch (estadoPago) {
         case 'exitoso':
@@ -118,7 +127,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
           break;
       }
     }
-  }, [searchParams]);
+  }, [searchParams, toast]);
 
   useEffect(() => {
     cargarDocumento();
@@ -357,72 +366,117 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
               {/* Overlay central con llamado a la acción */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 border-2 border-blue-500 transform hover:scale-105 transition-transform">
-                  {/* Icono de candado */}
-                  <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
-                      <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                      Contenido Bloqueado
-                    </h3>
-                    <p className="text-gray-600 mb-1">
-                      Desbloquea el documento completo
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Actualmente viendo: 15% del documento
-                    </p>
-                  </div>
+                  {verificandoPago ? (
+                    /* Estado de verificación de pago */
+                    <>
+                      <div className="text-center mb-6">
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
+                          <div className="relative">
+                            <div className="w-12 h-12 border-4 border-blue-200 rounded-full"></div>
+                            <div className="w-12 h-12 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+                          </div>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                          Verificando Pago
+                        </h3>
+                        <p className="text-gray-600 mb-1">
+                          Estamos confirmando tu pago con la pasarela
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Esto puede tomar unos segundos...
+                        </p>
+                      </div>
 
-                  {/* Información del precio */}
-                  <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200">
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600 mb-1">Precio del documento</p>
-                      <p className="text-3xl font-bold text-blue-600">
-                        ${documento.precio?.toLocaleString('es-CO')} <span className="text-lg text-gray-500">COP</span>
+                      {/* Barra de progreso */}
+                      <div className="bg-gray-100 rounded-lg p-4 mb-4">
+                        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${(intentosVerificacion / MAX_INTENTOS_VERIFICACION) * 100}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-sm text-center text-gray-600">
+                          {intentosVerificacion < MAX_INTENTOS_VERIFICACION
+                            ? `Verificando... (${Math.round((intentosVerificacion / MAX_INTENTOS_VERIFICACION) * 100)}%)`
+                            : 'Finalizando...'}
+                        </p>
+                      </div>
+
+                      <p className="text-xs text-gray-500 text-center">
+                        No cierres esta ventana mientras verificamos tu pago
                       </p>
-                    </div>
-                  </div>
+                    </>
+                  ) : (
+                    /* Estado normal - botón de pago */
+                    <>
+                      {/* Icono de candado */}
+                      <div className="text-center mb-6">
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
+                          <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                          Contenido Bloqueado
+                        </h3>
+                        <p className="text-gray-600 mb-1">
+                          Desbloquea el documento completo
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Actualmente viendo: 15% del documento
+                        </p>
+                      </div>
 
-                  {/* Botón de pago */}
-                  <Button
-                    onClick={() => setMostrarOpcionesPago(true)}
-                    variant="primary"
-                    className="w-full"
-                    disabled={procesandoPago}
-                  >
-                    {procesandoPago ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Procesando...
-                      </span>
-                    ) : (
-                      'Desbloquear Documento'
-                    )}
-                  </Button>
+                      {/* Información del precio */}
+                      <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200">
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600 mb-1">Precio del documento</p>
+                          <p className="text-3xl font-bold text-blue-600">
+                            ${documento.precio?.toLocaleString('es-CO')} <span className="text-lg text-gray-500">COP</span>
+                          </p>
+                        </div>
+                      </div>
 
-                  {/* Beneficios */}
-                  <div className="mt-6 space-y-2">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Documento completo y profesional
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Descarga en PDF lista para imprimir
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Acceso permanente al documento
-                    </div>
-                  </div>
+                      {/* Botón de pago */}
+                      <Button
+                        onClick={() => setMostrarOpcionesPago(true)}
+                        variant="primary"
+                        className="w-full"
+                        disabled={procesandoPago}
+                      >
+                        {procesandoPago ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Procesando...
+                          </span>
+                        ) : (
+                          'Desbloquear Documento'
+                        )}
+                      </Button>
+
+                      {/* Beneficios */}
+                      <div className="mt-6 space-y-2">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Documento completo y profesional
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Descarga en PDF lista para imprimir
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Acceso permanente al documento
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -577,41 +631,6 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
         </div>
       )}
 
-      {/* Modal de Verificación de Pago */}
-      {verificandoPago && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center animate-scaleIn">
-            {/* Spinner */}
-            <div className="flex justify-center mb-6">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
-                <div className="w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
-              </div>
-            </div>
-
-            {/* Texto */}
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
-              Verificando pago...
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Estamos confirmando tu pago con la pasarela. Esto puede tomar unos segundos.
-            </p>
-
-            {/* Barra de progreso */}
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(intentosVerificacion / MAX_INTENTOS_VERIFICACION) * 100}%` }}
-              ></div>
-            </div>
-            <p className="text-sm text-gray-500">
-              {intentosVerificacion < MAX_INTENTOS_VERIFICACION
-                ? `Intento ${intentosVerificacion + 1} de ${MAX_INTENTOS_VERIFICACION}`
-                : 'Finalizando...'}
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Modal de Pasarela de Pago Simulada */}
       {mostrarModalPago && (
