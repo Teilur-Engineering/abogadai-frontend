@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { casoService } from '../services/casoService';
 import Button from './Button';
@@ -76,12 +76,34 @@ const procesarDocumento = (texto) => {
  * - Habilita descarga solo si está pagado
  */
 export default function DocumentoViewer({ casoId, onPagoExitoso }) {
+  // Key para localStorage - definir primero para usar en inicialización
+  const PAGO_EN_PROCESO_KEY = `pago_en_proceso_${String(casoId)}`;
+  const TIEMPO_EXPIRACION = 10 * 60 * 1000; // 10 minutos en ms
+
+  // Verificar localStorage ANTES del primer render para inicializar correctamente
+  const [verificandoPago, setVerificandoPago] = useState(() => {
+    try {
+      const timestamp = localStorage.getItem(`pago_en_proceso_${String(casoId)}`);
+      if (!timestamp) return false;
+      const tiempoTranscurrido = Date.now() - parseInt(timestamp);
+      if (tiempoTranscurrido < 10 * 60 * 1000) {
+        // Hay un pago en proceso válido
+        return true;
+      } else {
+        // Expiró, limpiar
+        localStorage.removeItem(`pago_en_proceso_${String(casoId)}`);
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
+  });
+
   const [documento, setDocumento] = useState(null);
   const [loading, setLoading] = useState(true);
   const [procesandoPago, setProcesandoPago] = useState(false);
   const [mostrarModalPago, setMostrarModalPago] = useState(false);
   const [mostrarOpcionesPago, setMostrarOpcionesPago] = useState(false);
-  const [verificandoPago, setVerificandoPago] = useState(false);
   const [intentosVerificacion, setIntentosVerificacion] = useState(0);
   const [datosPago, setDatosPago] = useState({
     numeroTarjeta: '',
@@ -92,68 +114,28 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
   const toast = useToast();
   const [searchParams] = useSearchParams();
 
-  // Ref para evitar procesar el pago múltiples veces
-  const pagoProcessedRef = useRef(false);
-
   const MAX_INTENTOS_VERIFICACION = 30; // 30 intentos * 3 segundos = 90 segundos máximo
   const INTERVALO_VERIFICACION = 3000; // 3 segundos
 
-  // Key para localStorage del pago en proceso
-  const PAGO_EN_PROCESO_KEY = `pago_en_proceso_${casoId}`;
-
-  // Verificar si hay pago en proceso al montar el componente
+  // Manejar parámetros de URL (cancelado/error) - el localStorage ya se verificó arriba
   useEffect(() => {
-    // Evitar procesamiento múltiple
-    if (pagoProcessedRef.current) return;
-
-    // 1. Primero verificar parámetro de URL (si Vita lo pasa)
     const estadoPago = searchParams.get('pago');
+    if (estadoPago) {
+      // Limpiar URL
+      window.history.replaceState({}, '', window.location.pathname);
 
-    // 2. También verificar localStorage (backup si Vita no pasa parámetro)
-    const pagoEnProcesoTimestamp = localStorage.getItem(PAGO_EN_PROCESO_KEY);
-
-    // Verificar si el pago en localStorage no ha expirado (10 minutos máximo)
-    const TIEMPO_EXPIRACION = 10 * 60 * 1000; // 10 minutos en ms
-    let pagoEnProcesoValido = false;
-    if (pagoEnProcesoTimestamp) {
-      const tiempoTranscurrido = Date.now() - parseInt(pagoEnProcesoTimestamp);
-      if (tiempoTranscurrido < TIEMPO_EXPIRACION) {
-        pagoEnProcesoValido = true;
-      } else {
-        // Expiró, limpiar
+      if (estadoPago === 'cancelado') {
         localStorage.removeItem(PAGO_EN_PROCESO_KEY);
+        setVerificandoPago(false);
+        toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
+      } else if (estadoPago === 'error') {
+        localStorage.removeItem(PAGO_EN_PROCESO_KEY);
+        setVerificandoPago(false);
+        toast.error('Hubo un error procesando el pago. Por favor intenta de nuevo.');
       }
+      // Para 'exitoso' y 'pendiente', verificandoPago ya se inicializó como true desde localStorage
     }
-
-    if (estadoPago || pagoEnProcesoValido) {
-      pagoProcessedRef.current = true;
-
-      // Limpiar query params de la URL
-      if (estadoPago) {
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-      }
-
-      // Determinar acción basada en el estado
-      const estado = estadoPago || 'pendiente'; // Si viene de localStorage, asumir pendiente
-
-      switch (estado) {
-        case 'exitoso':
-        case 'pendiente':
-          // Iniciar verificación (el localStorage se limpia cuando confirma/falla)
-          iniciarVerificacionPago();
-          break;
-        case 'cancelado':
-          localStorage.removeItem(PAGO_EN_PROCESO_KEY);
-          toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
-          break;
-        case 'error':
-          localStorage.removeItem(PAGO_EN_PROCESO_KEY);
-          toast.error('Hubo un error procesando el pago. Por favor intenta de nuevo.');
-          break;
-      }
-    }
-  }, [casoId, searchParams, toast, PAGO_EN_PROCESO_KEY]);
+  }, []);
 
   useEffect(() => {
     cargarDocumento();
@@ -201,13 +183,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [verificandoPago, intentosVerificacion, casoId, PAGO_EN_PROCESO_KEY]);
-
-  // Iniciar verificación de pago con modal
-  const iniciarVerificacionPago = () => {
-    setVerificandoPago(true);
-    setIntentosVerificacion(0);
-  };
+  }, [verificandoPago, intentosVerificacion, casoId]);
 
   const cargarDocumento = async () => {
     try {
