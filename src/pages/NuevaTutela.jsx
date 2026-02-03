@@ -16,7 +16,8 @@ export default function NuevaTutela() {
   const { user } = useAuth();
   const toast = useToast();
   const [searchParams] = useSearchParams();
-  const modoVista = searchParams.get('mode') === 'view';
+  // Si hay casoId, SIEMPRE es modo vista (el formulario ya no se usa)
+  const modoVista = !!casoId;
   const [guardando, setGuardando] = useState(false);
   const [ultimoGuardado, setUltimoGuardado] = useState(null);
   const [generando, setGenerando] = useState(false);
