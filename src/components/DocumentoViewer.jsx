@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { casoService } from '../services/casoService';
 import Button from './Button';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 // Detectar si estamos en modo desarrollo
 const IS_DEVELOPMENT = import.meta.env.DEV || window.location.hostname === 'localhost';
@@ -128,7 +129,9 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
     nombreTitular: ''
   });
   const toast = useToast();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const isAdmin = user?.is_admin || false;
 
   const MAX_INTENTOS_VERIFICACION = 600; // 600 intentos * 3 segundos = 30 minutos máximo
   const INTERVALO_VERIFICACION = 3000; // 3 segundos
@@ -264,43 +267,22 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
     }
   };
 
-  // Simular pago (solo desarrollo)
-  const handleSimularPago = async (e) => {
-    e.preventDefault();
-
-    // Simular delay de procesamiento (1.5 segundos)
+  // Desbloquear como administrador (sin pago real)
+  const handleDesbloquearAdmin = async () => {
     setProcesandoPago(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
-      // Llamar al endpoint de simulación de pago
-      await casoService.simularPago(casoId);
-
-      // Cerrar modal
-      setMostrarModalPago(false);
-
-      // Recargar documento para mostrar versión completa
+      await casoService.desbloquearComoAdmin(casoId);
       await cargarDocumento();
 
-      // Notificar al componente padre si existe callback
       if (onPagoExitoso) {
         onPagoExitoso();
       }
 
-      // Mostrar mensaje de éxito
-      toast.success('¡Pago procesado exitosamente! El documento ha sido desbloqueado.');
-
-      // Limpiar formulario
-      setDatosPago({
-        numeroTarjeta: '',
-        fechaVencimiento: '',
-        cvv: '',
-        nombreTitular: ''
-      });
-
+      toast.success('Documento desbloqueado por administrador');
     } catch (error) {
-      console.error('Error al simular pago:', error);
-      const mensaje = error.response?.data?.detail || 'Error al procesar el pago';
+      console.error('Error desbloqueando como admin:', error);
+      const mensaje = error.response?.data?.detail || 'Error al desbloquear documento';
       toast.error(mensaje);
     } finally {
       setProcesandoPago(false);
@@ -479,6 +461,25 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
                         )}
                       </Button>
 
+                      {/* Botón de admin para desbloquear sin pago */}
+                      {isAdmin && (
+                        <Button
+                          onClick={handleDesbloquearAdmin}
+                          variant="secondary"
+                          className="w-full mt-3 bg-purple-100 hover:bg-purple-200 text-purple-700 border-purple-300"
+                          disabled={procesandoPago}
+                        >
+                          {procesandoPago ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-700"></div>
+                              Desbloqueando...
+                            </span>
+                          ) : (
+                            '🔓 Desbloquear (Admin)'
+                          )}
+                        </Button>
+                      )}
+
                       {/* Beneficios */}
                       <div className="mt-6 space-y-2">
                         <div className="flex items-center text-sm text-gray-600">
@@ -613,36 +614,6 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
                 <span className="text-xs text-gray-500">Daviplata</span>
               </div>
 
-              {/* Separador con opción de desarrollo */}
-              {IS_DEVELOPMENT && (
-                <>
-                  <div className="relative py-4">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-200"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-white text-gray-500">o en modo desarrollo</span>
-                    </div>
-                  </div>
-
-                  {/* Botón de simulación (solo desarrollo) */}
-                  <button
-                    onClick={() => {
-                      setMostrarOpcionesPago(false);
-                      setMostrarModalPago(true);
-                    }}
-                    disabled={procesandoPago}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl transition-colors disabled:opacity-50 border border-gray-300"
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Simular Pago (Dev)
-                    </span>
-                  </button>
-                </>
-              )}
             </div>
 
             {/* Seguridad */}

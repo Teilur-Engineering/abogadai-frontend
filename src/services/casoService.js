@@ -119,14 +119,15 @@ export const casoService = {
   },
 
   /**
-   * Simular pago y desbloquear documento (solo desarrollo)
+   * Desbloquear documento como administrador (sin pago real)
+   * Solo funciona para usuarios con is_admin=true
    */
-  async simularPago(casoId) {
+  async desbloquearComoAdmin(casoId) {
     try {
-      const response = await api.post(`/casos/${casoId}/simular-pago`);
+      const response = await api.post(`/casos/${casoId}/desbloquear-admin`);
       return response.data;
     } catch (error) {
-      console.error('Error simulando pago:', error);
+      console.error('Error desbloqueando como admin:', error);
       throw error;
     }
   },
