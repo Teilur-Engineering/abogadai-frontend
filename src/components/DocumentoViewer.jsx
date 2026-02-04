@@ -80,9 +80,25 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
   const PAGO_EN_PROCESO_KEY = `pago_en_proceso_${String(casoId)}`;
   const TIEMPO_EXPIRACION = 30 * 60 * 1000; // 30 minutos en ms
 
-  // Verificar localStorage ANTES del primer render para inicializar correctamente
+  // Verificar URL y localStorage ANTES del primer render para inicializar correctamente
   const [verificandoPago, setVerificandoPago] = useState(() => {
     try {
+      // PRIMERO: Verificar parámetros de URL (tienen prioridad)
+      const urlParams = new URLSearchParams(window.location.search);
+      const estadoPagoUrl = urlParams.get('pago');
+
+      // Si Vita dice que falló (error/cancelado), NO entrar en modo verificación
+      if (estadoPagoUrl === 'error' || estadoPagoUrl === 'cancelado') {
+        localStorage.removeItem(`pago_en_proceso_${String(casoId)}`);
+        return false;
+      }
+
+      // Si Vita dice exitoso o pendiente, SÍ verificar
+      if (estadoPagoUrl === 'exitoso' || estadoPagoUrl === 'pendiente') {
+        return true;
+      }
+
+      // SEGUNDO: Si no hay parámetro de URL, verificar localStorage
       const timestamp = localStorage.getItem(`pago_en_proceso_${String(casoId)}`);
       if (!timestamp) return false;
       const tiempoTranscurrido = Date.now() - parseInt(timestamp);
@@ -117,23 +133,24 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
   const MAX_INTENTOS_VERIFICACION = 600; // 600 intentos * 3 segundos = 30 minutos máximo
   const INTERVALO_VERIFICACION = 3000; // 3 segundos
 
-  // Manejar parámetros de URL (cancelado/error) - el localStorage ya se verificó arriba
+  // Manejar parámetros de URL y mostrar mensajes correspondientes
+  // NOTA: El estado verificandoPago ya se inicializó correctamente en useState
   useEffect(() => {
     const estadoPago = searchParams.get('pago');
     if (estadoPago) {
-      // Limpiar URL
+      // Limpiar URL para que no se muestre el parámetro
       window.history.replaceState({}, '', window.location.pathname);
 
+      // Mostrar mensaje según el estado (el estado verificandoPago ya está correcto)
       if (estadoPago === 'cancelado') {
-        localStorage.removeItem(PAGO_EN_PROCESO_KEY);
-        setVerificandoPago(false);
         toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
       } else if (estadoPago === 'error') {
-        localStorage.removeItem(PAGO_EN_PROCESO_KEY);
-        setVerificandoPago(false);
         toast.error('Hubo un error procesando el pago. Por favor intenta de nuevo.');
+      } else if (estadoPago === 'exitoso') {
+        toast.info('Verificando confirmación del pago...');
+      } else if (estadoPago === 'pendiente') {
+        toast.info('El pago está siendo procesado...');
       }
-      // Para 'exitoso' y 'pendiente', verificandoPago ya se inicializó como true desde localStorage
     }
   }, []);
 
