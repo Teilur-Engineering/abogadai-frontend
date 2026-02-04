@@ -143,8 +143,16 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
 
       // Mostrar mensaje según el estado (el estado verificandoPago ya está correcto)
       if (estadoPago === 'cancelado') {
+        // Cancelar pago pendiente en backend para permitir reintentar
+        casoService.cancelarPagoPendiente(casoId).catch(err => {
+          console.error('Error cancelando pago pendiente:', err);
+        });
         toast.info('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
       } else if (estadoPago === 'error') {
+        // Cancelar pago pendiente en backend para permitir reintentar
+        casoService.cancelarPagoPendiente(casoId).catch(err => {
+          console.error('Error cancelando pago pendiente:', err);
+        });
         toast.error('Hubo un error procesando el pago. Por favor intenta de nuevo.');
       } else if (estadoPago === 'exitoso') {
         toast.info('Verificando confirmación del pago...');

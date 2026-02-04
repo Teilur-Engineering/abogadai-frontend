@@ -165,6 +165,23 @@ export const casoService = {
   },
 
   /**
+   * Cancelar pago pendiente para permitir reintentar
+   * Se usa cuando Vita redirige con error o cancelado
+   *
+   * @param {number} casoId - ID del caso
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  async cancelarPagoPendiente(casoId) {
+    try {
+      const response = await api.post(`/casos/${casoId}/pago/cancelar`);
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelando pago pendiente:', error);
+      throw error;
+    }
+  },
+
+  /**
    * 🔔 Verificar si hay casos con novedades sin ver
    */
   async tieneNovedades() {
