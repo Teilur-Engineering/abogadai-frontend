@@ -179,6 +179,21 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
           const estado = await casoService.obtenerEstadoPago(casoId);
 
           if (estado.documento_desbloqueado || estado.estado === 'EXITOSO') {
+            // GTM: Evento de conversión de pago
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+              event: 'purchase',
+              transaction_id: estado.referencia_pago || String(casoId),
+              value: documento?.precio || 0,
+              currency: 'COP',
+              items: [{
+                item_name: documento?.tipo_documento === 'TUTELA' ? 'Tutela' : 'Derecho de Petición',
+                item_id: String(casoId),
+                price: documento?.precio || 0,
+                quantity: 1
+              }]
+            });
+
             // Pago confirmado - limpiar localStorage
             localStorage.removeItem(PAGO_EN_PROCESO_KEY);
             setVerificandoPago(false);
