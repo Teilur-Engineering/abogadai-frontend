@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Button from '../components/Button';
 import Input from '../components/Input';
+import { trackEvent } from '../utils/analytics';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function Login() {
 
     try {
       await login(formData);
+      trackEvent('login_complete');
       toast.success('Inicio de sesión exitoso');
 
       // Marcar que acaba de hacer login para reproducir video de bienvenida

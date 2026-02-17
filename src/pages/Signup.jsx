@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Button from '../components/Button';
 import Input from '../components/Input';
+import { trackEvent } from '../utils/analytics';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -17,6 +18,11 @@ export default function Signup() {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
+
+  // Tracking: usuario llegó a la página de registro
+  useEffect(() => {
+    trackEvent('signup_start');
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -43,9 +49,11 @@ export default function Signup() {
     try {
       const { confirmPassword, ...signupData } = formData;
       await signup(signupData);
+      trackEvent('signup_complete');
       toast.success('Cuenta creada exitosamente');
       navigate('/login');
     } catch (err) {
+      trackEvent('signup_error', { error_message: err.response?.data?.detail || 'Error desconocido' });
       toast.error(err.response?.data?.detail || 'Error al registrarse');
     } finally {
       setLoading(false);

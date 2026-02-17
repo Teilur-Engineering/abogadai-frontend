@@ -4,6 +4,7 @@ import { casoService } from '../services/casoService';
 import Button from './Button';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { trackEvent } from '../utils/analytics';
 
 // Detectar si estamos en modo desarrollo
 const IS_DEVELOPMENT = import.meta.env.DEV || window.location.hostname === 'localhost';
@@ -202,6 +203,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
             cargarDocumento();
             if (onPagoExitoso) onPagoExitoso();
           } else if (estado.estado === 'FALLIDO') {
+            trackEvent('payment_failed', { case_id: casoId });
             // Pago falló - limpiar localStorage
             localStorage.removeItem(PAGO_EN_PROCESO_KEY);
             setVerificandoPago(false);
@@ -233,6 +235,9 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
       setLoading(true);
       const data = await casoService.obtenerDocumento(casoId);
       setDocumento(data);
+      if (data?.preview) {
+        trackEvent('payment_screen_view', { case_id: casoId, amount: data.precio, currency: 'COP' });
+      }
     } catch (error) {
       console.error('Error al cargar documento:', error);
       toast.error('Error al cargar el documento');
@@ -259,6 +264,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
 
   // Pagar con Vita Wallet (producción)
   const handlePagarConVita = async () => {
+    trackEvent('payment_initiate', { case_id: casoId, payment_method: 'vita_wallet', amount: documento?.precio, currency: 'COP' });
     setProcesandoPago(true);
 
     try {
@@ -461,7 +467,7 @@ export default function DocumentoViewer({ casoId, onPagoExitoso }) {
 
                       {/* Botón de pago */}
                       <Button
-                        onClick={() => setMostrarOpcionesPago(true)}
+                        onClick={() => { trackEvent('payment_options_open', { case_id: casoId, amount: documento?.precio }); setMostrarOpcionesPago(true); }}
                         variant="primary"
                         className="w-full"
                         disabled={procesandoPago}

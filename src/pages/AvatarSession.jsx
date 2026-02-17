@@ -10,6 +10,7 @@ import { useSessionState, SESSION_STATES } from '../hooks/useSessionState';
 import TranscriptPanel from '../components/TranscriptPanel';
 import RevisionRapida from '../components/RevisionRapida';
 import ModalConfirmarSalida from '../components/ModalConfirmarSalida';
+import { trackEvent } from '../utils/analytics';
 
 // Componente para detectar participantes remotos (avatar)
 function AvatarDetector({ onAvatarConnected }) {
@@ -332,6 +333,7 @@ export default function AvatarSession() {
 
   // Handler: Iniciar sesión directamente (crear caso + conectar a LiveKit)
   const handleConfirmarIniciarSesion = async () => {
+    trackEvent('case_creation_initiated');
 
     try {
       console.log('🚀 Paso 1: Creando caso...');
@@ -339,6 +341,7 @@ export default function AvatarSession() {
       const nuevoCasoId = casoData.caso_id;
       setCasoId(nuevoCasoId);
       console.log('✅ Caso creado:', nuevoCasoId);
+      trackEvent('case_created', { case_id: nuevoCasoId });
 
       console.log('🔌 Paso 2: Conectando a LiveKit...');
       const tokenData = await livekitService.conectarSesion(nuevoCasoId);
@@ -348,9 +351,11 @@ export default function AvatarSession() {
       setSessionTime(0);
       setTimeRemaining(15 * 60); // 15 minutos para producción
 
+      trackEvent('sofia_session_start', { case_id: nuevoCasoId });
       sessionState.goToEnSesion(tokenData);
     } catch (err) {
       console.error('❌ Error iniciando sesión:', err);
+      trackEvent('session_error', { error_message: err.message });
       sessionState.setStateError('Error al iniciar sesión. Por favor intenta de nuevo.');
     }
   };
@@ -360,7 +365,9 @@ export default function AvatarSession() {
     if (!casoId) return;
 
     try {
+      trackEvent('sofia_session_end', { case_id: casoId, session_duration_seconds: sessionTime });
       sessionState.goToProcesando();
+      trackEvent('sofia_processing_start', { case_id: casoId });
 
       console.log('🔚 Finalizando sesión...');
       await livekitService.finalizarSesion(casoId);
@@ -373,6 +380,7 @@ export default function AvatarSession() {
       setConversacion(mensajes);
 
       console.log('✅ Pasando a revisión');
+      trackEvent('sofia_review_start', { case_id: casoId });
       sessionState.goToRevision(casoActualizado);
     } catch (err) {
       console.error('❌ Error finalizando sesión:', err);
@@ -388,6 +396,7 @@ export default function AvatarSession() {
   // Handler: Confirmar abandono (eliminar caso y salir)
   const handleConfirmarAbandono = async () => {
     try {
+      trackEvent('session_abandoned', { case_id: casoId, session_duration_seconds: sessionTime });
       console.log('🚪 Abandonando llamada...');
 
       if (casoId) {

@@ -5,6 +5,7 @@ import casoService from '../services/casoService';
 import api from '../services/api';
 import Button from './Button';
 import Modal from './Modal';
+import { trackEvent } from '../utils/analytics';
 
 /**
  * Componente de Revisión Rápida (Estado D según plan.md)
@@ -125,6 +126,7 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
       return;
     }
 
+    trackEvent('document_generation_initiated', { case_id: caso.id, document_type: formData.tipo_documento });
     // Mostrar confirmación de datos sensibles
     setConfirmacionVisible(true);
   };
@@ -155,6 +157,7 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Mostrar toast de éxito
+      trackEvent('document_generated', { case_id: caso.id, document_type: formData.tipo_documento });
       toast.success('Documento generado');
 
       // Redireccionar al caso en modo vista
@@ -164,6 +167,7 @@ export default function RevisionRapida({ caso, conversacion = [], onCasoUpdated,
 
     } catch (error) {
       console.error('Error generando documento:', error);
+      trackEvent('document_generation_error', { case_id: caso.id, error_message: error.message });
       toast.error(error.response?.data?.detail?.message || 'Error al generar el documento');
       setProgressStep(0);
     } finally {

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
 import api from '../services/api';
+import { trackEvent } from '../utils/analytics';
 
 /**
  * PagoExitoso - Página de confirmación de pago exitoso
@@ -46,6 +47,7 @@ export default function PagoExitoso() {
       // Obtener información del caso
       const responseCaso = await api.get(`/casos/${casoId}`);
       setCaso(responseCaso.data);
+      trackEvent('payment_success_page_view', { case_id: casoId, document_type: responseCaso.data?.tipo_documento });
 
       // Obtener beneficios del pago
       // Esta información podría venir de:
