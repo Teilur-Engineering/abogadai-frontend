@@ -21,6 +21,7 @@ export default function NuevaTutela() {
   const [guardando, setGuardando] = useState(false);
   const [ultimoGuardado, setUltimoGuardado] = useState(null);
   const [generando, setGenerando] = useState(false);
+  const [errorGeneracion, setErrorGeneracion] = useState(false);
   const [documentoGenerado, setDocumentoGenerado] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
   const autoGuardadoRef = useRef(null);
@@ -284,24 +285,39 @@ export default function NuevaTutela() {
 
     try {
       setGenerando(true);
+      setErrorGeneracion(false);
 
       // Validar antes de generar
       const validacion = await validarCaso();
       if (validacion && !validacion.valido) {
-        // No generamos, el usuario verá el resumen de errores en pantalla
         toast.error('Por favor corrige los errores señalados antes de generar el documento');
-        // Scroll al resumen de validación
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
-      const casoActualizado = await casoService.generarDocumento(casoId);
-      setCaso(casoActualizado);
-      setDocumentoGenerado(casoActualizado.documento_generado);
+      // Generar con polling: el backend retorna 202 y genera en background
+      const casoFinal = await casoService.generarDocumentoAsync(
+        casoId,
+        (casoActual) => setCaso({ ...casoActual }) // actualizar estado durante polling
+      );
+
+      setCaso(casoFinal);
+      setDocumentoGenerado(casoFinal.documento_generado);
       setModoEdicion(false);
       toast.success('¡Documento generado exitosamente con IA!');
     } catch (error) {
       console.error('Error generando documento:', error);
+
+      if (error.message === 'TIMEOUT') {
+        toast.error('La generación tardó demasiado. Por favor recarga la página para verificar el estado.');
+        return;
+      }
+
+      if (error.message === 'ERROR_GENERACION') {
+        setErrorGeneracion(true);
+        toast.error('Ocurrió un error al generar el documento. Puedes intentarlo nuevamente.');
+        return;
+      }
 
       // Manejar error 422 con detalles de validación
       if (error.response?.status === 422 && error.response?.data?.detail) {
@@ -924,16 +940,37 @@ export default function NuevaTutela() {
               Volver
             </Button>
             <div className="flex gap-4">
-              {casoId && (
-                <Button
-                  type="button"
-                  variant="success"
-                  onClick={handleGenerarDocumento}
-                  loading={generando}
-                  disabled={generando}
-                >
-                  {generando ? 'Generando con IA...' : '🤖 Generar Documento con IA'}
-                </Button>
+              {casoId && !generando && errorGeneracion && (
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={handleGenerarDocumento}
+                  >
+                    Error al generar — Reintentar
+                  </Button>
+                  <span className="text-xs" style={{ color: 'var(--neutral-500)' }}>
+                    Ocurrió un error. Puedes volver a intentarlo.
+                  </span>
+                </div>
+              )}
+              {casoId && !errorGeneracion && (
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    type="button"
+                    variant="success"
+                    onClick={handleGenerarDocumento}
+                    loading={generando}
+                    disabled={generando}
+                  >
+                    {generando ? 'Generando con IA...' : '🤖 Generar Documento con IA'}
+                  </Button>
+                  {generando && (
+                    <span className="text-xs" style={{ color: 'var(--neutral-500)' }}>
+                      Puede tomar hasta 30 segundos
+                    </span>
+                  )}
+                </div>
               )}
               <Button
                 type="submit"

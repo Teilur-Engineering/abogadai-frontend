@@ -80,6 +80,47 @@ export const casoService = {
     }
   },
 
+  /**
+   * Inicia la generación y hace polling hasta que el documento esté listo.
+   * @param {number} casoId
+   * @param {function} onProgress - callback(caso) llamado en cada poll
+   * @param {number} timeoutMs - timeout máximo en ms (default 120 000)
+   * @returns {Promise<object>} caso con estado GENERADO
+   */
+  async generarDocumentoAsync(casoId, onProgress, timeoutMs = 120_000) {
+    // Iniciar generación (202)
+    const { data: casoInicial } = await api.post(`/casos/${casoId}/generar`);
+    if (onProgress) onProgress(casoInicial);
+
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+
+      const interval = setInterval(async () => {
+        try {
+          if (Date.now() - start > timeoutMs) {
+            clearInterval(interval);
+            reject(new Error('TIMEOUT'));
+            return;
+          }
+
+          const { data: caso } = await api.get(`/casos/${casoId}`);
+          if (onProgress) onProgress(caso);
+
+          if (caso.estado === 'GENERADO') {
+            clearInterval(interval);
+            resolve(caso);
+          } else if (caso.estado === 'ERROR_GENERACION') {
+            clearInterval(interval);
+            reject(new Error('ERROR_GENERACION'));
+          }
+        } catch (err) {
+          clearInterval(interval);
+          reject(err);
+        }
+      }, 2000);
+    });
+  },
+
   async descargarPDF(casoId) {
     try {
       const response = await api.get(`/casos/${casoId}/descargar/pdf`, {
