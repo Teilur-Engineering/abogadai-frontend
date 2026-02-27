@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Button from '../components/Button';
@@ -7,7 +7,6 @@ import Input from '../components/Input';
 import { trackEvent } from '../utils/analytics';
 
 export default function Signup() {
-  const navigate = useNavigate();
   const { signup } = useAuth();
   const toast = useToast();
   const [formData, setFormData] = useState({
@@ -18,6 +17,7 @@ export default function Signup() {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
+  const [enviado, setEnviado] = useState(false);
 
   // Tracking: usuario llegó a la página de registro
   useEffect(() => {
@@ -50,8 +50,7 @@ export default function Signup() {
       const { confirmPassword, ...signupData } = formData;
       await signup(signupData);
       trackEvent('signup_complete');
-      toast.success('Cuenta creada exitosamente');
-      navigate('/login');
+      setEnviado(true);
     } catch (err) {
       trackEvent('signup_error', { error_message: err.response?.data?.detail || 'Error desconocido' });
       toast.error(err.response?.data?.detail || 'Error al registrarse');
@@ -59,6 +58,80 @@ export default function Signup() {
       setLoading(false);
     }
   };
+
+  // Pantalla de confirmación tras registro exitoso
+  if (enviado) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-4 animate-fadeIn"
+        style={{
+          background: 'linear-gradient(135deg, var(--neutral-900) 0%, var(--color-primary) 100%)',
+        }}
+      >
+        <div
+          className="max-w-md w-full space-y-8 p-8 rounded-2xl shadow-2xl animate-slideUp text-center"
+          style={{
+            backgroundColor: 'white',
+            boxShadow: 'var(--shadow-xl)',
+          }}
+        >
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <img
+              src="/assets/logo.png"
+              alt="Abogadai Logo"
+              className="w-16 h-16 object-contain"
+            />
+            <h1 className="text-4xl font-bold tracking-tight">
+              <span style={{ color: '#1a1a1a' }}>Abogad</span>
+              <span style={{ color: '#0b6dff' }}>ai</span>
+            </h1>
+          </div>
+
+          <div
+            className="rounded-full flex items-center justify-center mx-auto"
+            style={{
+              width: '72px',
+              height: '72px',
+              backgroundColor: '#dcfce7',
+            }}
+          >
+            <svg width="36" height="36" fill="none" stroke="#16a34a" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+
+          <h2 className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>
+            Revisa tu email
+          </h2>
+
+          <p style={{ color: 'var(--neutral-600)', lineHeight: '1.6' }}>
+            Te enviamos un enlace de verificación a{' '}
+            <strong>{formData.email}</strong>.
+            <br />
+            Haz clic en el enlace para activar tu cuenta.
+          </p>
+
+          <p className="text-sm" style={{ color: 'var(--neutral-500)' }}>
+            ¿No lo ves? Revisa la carpeta de spam.
+          </p>
+
+          <div className="pt-4">
+            <Link
+              to="/login"
+              style={{
+                color: 'var(--color-primary)',
+                fontWeight: 'var(--font-weight-medium)',
+                textDecoration: 'none',
+                fontSize: 'var(--font-size-sm)',
+              }}
+            >
+              Volver al inicio de sesión
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

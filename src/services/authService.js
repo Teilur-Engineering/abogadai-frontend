@@ -8,9 +8,6 @@ export const authService = {
 
   async login(credentials) {
     const response = await api.post('/auth/login', credentials);
-    if (response.data.access_token) {
-      localStorage.setItem('token', response.data.access_token);
-    }
     return response.data;
   },
 
@@ -22,14 +19,14 @@ export const authService = {
     return userData;
   },
 
-  logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user'); // Limpiar también el usuario
+  async logout() {
+    try {
+      await api.post('/auth/logout');
+    } catch (_) {
+      // Ignorar errores al hacer logout
+    }
+    localStorage.removeItem('user');
     window.location.href = '/login';
-  },
-
-  isAuthenticated() {
-    return !!localStorage.getItem('token');
   },
 
   // Obtener usuario desde localStorage (sin hacer request)
@@ -45,6 +42,11 @@ export const authService = {
 
   async resetPassword(token, new_password) {
     const response = await api.post('/auth/reset-password', { token, new_password });
+    return response.data;
+  },
+
+  async resendVerification(email) {
+    const response = await api.post('/auth/resend-verification', { email });
     return response.data;
   },
 };

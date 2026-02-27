@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { authService } from '../services/authService';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { trackEvent } from '../utils/analytics';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   const toast = useToast();
   const [formData, setFormData] = useState({
@@ -15,17 +17,31 @@ export default function Login() {
     password: '',
   });
   const [loading, setLoading] = useState(false);
+  const [emailNoVerificado, setEmailNoVerificado] = useState(false);
+  const [reenvioLoading, setReenvioLoading] = useState(false);
+
+  // Mostrar toast si llega con ?verificado=true o ?verificado=error
+  useEffect(() => {
+    const verificado = searchParams.get('verificado');
+    if (verificado === 'true') {
+      toast.success('¡Email verificado! Ya puedes iniciar sesión.');
+    } else if (verificado === 'error') {
+      toast.error('El enlace de verificación es inválido o ha expirado.');
+    }
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+    if (emailNoVerificado) setEmailNoVerificado(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setEmailNoVerificado(false);
 
     try {
       await login(formData);
@@ -34,22 +50,40 @@ export default function Login() {
 
       // Marcar que acaba de hacer login para reproducir video de bienvenida
       sessionStorage.setItem('justLoggedIn', 'true');
-      console.log('✅ Login exitoso - Flag de video establecida');
 
-      // Verificar si hay una URL guardada para redirigir (ej: /app/admin/reembolsos)
+      // Verificar si hay una URL guardada para redirigir
       const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
       if (redirectUrl) {
-        console.log('🔄 Redirigiendo a URL guardada:', redirectUrl);
-        sessionStorage.removeItem('redirectAfterLogin'); // Limpiar
+        sessionStorage.removeItem('redirectAfterLogin');
         navigate(redirectUrl);
       } else {
-        console.log('🏠 Redirigiendo a /app (default)');
         navigate('/app');
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error al iniciar sesión');
+      const detail = err.response?.data?.detail;
+      if (detail === 'EMAIL_NOT_VERIFIED') {
+        setEmailNoVerificado(true);
+      } else {
+        toast.error(detail || 'Error al iniciar sesión');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReenviarVerificacion = async () => {
+    if (!formData.email) {
+      toast.error('Ingresa tu email para reenviar la verificación');
+      return;
+    }
+    setReenvioLoading(true);
+    try {
+      await authService.resendVerification(formData.email);
+      toast.success('Enlace de verificación enviado. Revisa tu bandeja de entrada.');
+    } catch (_) {
+      toast.error('Error al reenviar el enlace. Inténtalo más tarde.');
+    } finally {
+      setReenvioLoading(false);
     }
   };
 
@@ -131,6 +165,38 @@ export default function Login() {
               }
             />
           </div>
+
+          {/* Banner: email no verificado */}
+          {emailNoVerificado && (
+            <div
+              className="rounded-lg p-4 text-sm"
+              style={{ backgroundColor: '#fef3c7', border: '1px solid #f59e0b' }}
+            >
+              <p style={{ color: '#92400e', fontWeight: '600', marginBottom: '8px' }}>
+                Por favor verifica tu email antes de iniciar sesión.
+              </p>
+              <p style={{ color: '#78350f', marginBottom: '12px' }}>
+                Revisa tu bandeja de entrada (y la carpeta de spam).
+              </p>
+              <button
+                type="button"
+                onClick={handleReenviarVerificacion}
+                disabled={reenvioLoading}
+                style={{
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  fontWeight: '600',
+                  cursor: reenvioLoading ? 'not-allowed' : 'pointer',
+                  opacity: reenvioLoading ? 0.7 : 1,
+                }}
+              >
+                {reenvioLoading ? 'Enviando...' : 'Reenviar enlace de verificación'}
+              </button>
+            </div>
+          )}
 
           <div className="space-y-4">
             <Button

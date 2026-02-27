@@ -13,16 +13,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = async () => {
-    if (authService.isAuthenticated()) {
-      try {
-        const userData = await authService.getCurrentUser();
-        setUser(userData);
-      } catch (error) {
-        console.error('Error verificando autenticación:', error);
-        authService.logout();
-      }
+    try {
+      // Cookie httpOnly is sent automatically — just call /auth/me
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+    } catch (error) {
+      // 401 = no valid session, that's fine on public pages
+      setUser(null);
+      localStorage.removeItem('user');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const login = async (credentials) => {
