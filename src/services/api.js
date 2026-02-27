@@ -13,6 +13,16 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Inyectar token como Bearer en cada request (funciona en entornos cross-site
+// donde las cookies SameSite=lax no se envían en peticiones AJAX)
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Interceptor para manejar errores de autenticación
 api.interceptors.response.use(
   (response) => response,

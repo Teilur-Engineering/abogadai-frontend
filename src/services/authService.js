@@ -8,6 +8,11 @@ export const authService = {
 
   async login(credentials) {
     const response = await api.post('/auth/login', credentials);
+    // Guardar token en localStorage como fallback para entornos cross-site
+    // donde las cookies SameSite=lax no se envían en peticiones AJAX
+    if (response.data?.access_token) {
+      localStorage.setItem('access_token', response.data.access_token);
+    }
     return response.data;
   },
 
@@ -26,6 +31,7 @@ export const authService = {
       // Ignorar errores al hacer logout
     }
     localStorage.removeItem('user');
+    localStorage.removeItem('access_token');
     window.location.href = '/login';
   },
 
