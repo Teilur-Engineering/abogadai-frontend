@@ -144,6 +144,25 @@ export default function Login() {
             </Button>
 
             <div className="text-center text-sm">
+              <Link
+                to="/forgot-password"
+                style={{
+                  color: 'var(--neutral-500)',
+                  textDecoration: 'none',
+                  fontSize: 'var(--font-size-sm)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--neutral-500)';
+                }}
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+
+            <div className="text-center text-sm">
               <span style={{ color: 'var(--neutral-600)' }}>
                 ¿No tienes cuenta?{' '}
               </span>

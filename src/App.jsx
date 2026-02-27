@@ -6,6 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import OlvideContrasena from './pages/OlvideContrasena';
+import RestablecerContrasena from './pages/RestablecerContrasena';
 import AvatarSession from './pages/AvatarSession';
 import NuevaTutela from './pages/NuevaTutela';
 import MisCasos from './pages/MisCasos';
@@ -27,6 +29,8 @@ function App() {
             {/* Rutas públicas */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<OlvideContrasena />} />
+            <Route path="/reset-password" element={<RestablecerContrasena />} />
 
             {/* Rutas de administración */}
             <Route
